@@ -3,10 +3,24 @@
 """Custom assessment import/export commands:
 ``flask export-custom-assessments`` and ``flask import-custom-assessments``."""
 
+import io
 import click
+import json as _json
+import tarfile
+import uuid as _uuid
 import os
 from flask.cli import with_appcontext
-
+from ..helpers.assessment_io import (
+    build_openvex_archive,
+    is_openvex_doc,
+    import_statements as _import_openvex_statements,
+    build_variant_by_name_map,
+    import_archive_bytes,
+)
+from ..models.assessment import Assessment as DBAssessment
+from ..models.variant import Variant as DBVariant
+from datetime import datetime as _dt, timezone as _tz
+from collections import defaultdict
 
 @click.command("export-custom-assessments")
 @click.option("--output-dir", default="/scan/outputs", show_default=True,
@@ -17,16 +31,6 @@ from flask.cli import with_appcontext
 @with_appcontext
 def export_custom_assessments_command(output_dir: str, project: str, variant: str | None) -> None:
     """Export handmade (custom) assessments as an (archive of) OpenVEX file(s)."""
-    import io
-    import tarfile
-    import uuid as _uuid
-    import json as _json
-    from datetime import datetime as _dt, timezone as _tz
-    from collections import defaultdict
-    from ..models.assessment import (
-        Assessment as DBAssessment,
-    )
-    from ..models.variant import Variant as DBVariant
 
     author = os.getenv("AUTHOR_NAME", "Savoir-faire Linux")
     now_iso = _dt.now(_tz.utc).isoformat()
@@ -193,14 +197,6 @@ def export_custom_assessments_command(output_dir: str, project: str, variant: st
 @with_appcontext
 def import_custom_assessments_command(file_path: str, project: str, variant: str | None) -> None:
     """Import custom assessments from a .json or .tar.gz OpenVEX file."""
-    import json as _json
-    from ..helpers.openvex_assessments import (
-        is_openvex_doc,
-        import_statements as _import_openvex_statements,
-        build_variant_by_name_map,
-        import_archive_bytes,
-    )
-
     if not os.path.isfile(file_path):
         click.echo(f"Error: file not found: {file_path}", err=True)
         raise SystemExit(1)
@@ -425,7 +421,7 @@ def import_custom_assessments_command(file_path: str, project: str, variant: str
 
         try:
             with open(file_path) as fh:
-                data = _json.load(fh)
+                data = json.load(fh)
         except Exception:
             click.echo("Error: invalid JSON file.", err=True)
             raise SystemExit(1)

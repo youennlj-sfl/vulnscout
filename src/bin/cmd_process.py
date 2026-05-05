@@ -108,11 +108,11 @@ def read_inputs(controllers, scan_id=None):
     if use_fastspdx:
         verbose("merger_ci: Using FastSPDX parser")
 
-    pkgCtrl = controllers["packages"]
+    pkgCtrl: PackagesController = controllers["packages"]
     docs = SBOMDocument.get_by_scan(scan_id) if scan_id is not None else SBOMDocument.get_all()
 
     for doc in docs:
-        pkgCtrl.set_sbom_document(doc.id)
+        pkgCtrl.current_sbom_document = doc
         try:
             verbose(f"merger_ci: Reading {doc.path} (format={doc.format!r})")
             with open(doc.path, "r") as f:
@@ -161,7 +161,7 @@ def read_inputs(controllers, scan_id=None):
             else:
                 print(f"Ignored: Error parsing {doc.path}: {e}")
         finally:
-            pkgCtrl.set_sbom_document(None)
+            pkgCtrl.current_sbom_document = None
 
     return {
         "cdx": cdx,

@@ -1,13 +1,12 @@
 # Copyright (C) 2026 Savoir-faire Linux, Inc.
 # SPDX-License-Identifier: GPL-3.0-only
 
-from ..models.assessment import Assessment
-from ..models.package import Package
 from typing import Optional
+import uuid
+
+from ..models import Assessment, Package, Finding
 from ..helpers.verbose import verbose
 from ..extensions import db
-from ..models.assessment import Assessment as DBAssessment
-from ..models.finding import Finding
 
 
 def _persist_assessment_to_db(
@@ -53,7 +52,7 @@ def _persist_assessment_to_db(
                     finding = Finding.get_or_create(pkg_uuid, assessment.vuln_id)
                     finding_cache[cache_key] = finding
 
-                DBAssessment.from_vuln_assessment(assessment, finding_id=finding.id, variant_id=variant_id)
+                Assessment.from_vuln_assessment(assessment, finding_id=finding.id, variant_id=variant_id)
     except Exception as e:
         verbose(f"[_persist_assessment_to_db {assessment.vuln_id!r}] {e}")
 
@@ -72,7 +71,7 @@ class AssessmentsController:
         self.packagesCtrl = pkgCtrl
         self.vulnerabilitiesCtrl = vulnCtrl
         self.assessments = {}
-        self.current_variant_id = None
+        self.current_variant_id: uuid.UUID | None = None
         """A dictionary of assessments, indexed by their id."""
         # Secondary indexes for O(1) lookups in hot ingestion paths.
         self._by_vuln: dict[str, list[str]] = {}       # vuln_id → [assessment_key, ...]
@@ -257,7 +256,7 @@ class AssessmentsController:
         if self.assessments:
             return {k: v.to_dict() for k, v in self.assessments.items()}
         try:
-            return {str(a.id): a.to_dict() for a in DBAssessment.get_all()}
+            return {str(a.id): a.to_dict() for a in Assessment.get_all()}
         except Exception as e:
             verbose(f"[AssessmentsController.to_dict] {e}")
             return {}

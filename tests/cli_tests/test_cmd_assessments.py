@@ -8,7 +8,6 @@ Targets uncovered branches reported by the CI coverage run:
 
 import json
 import pytest
-from unittest.mock import patch
 
 from src.bin.webapp import create_app
 from src.extensions import db as _db
@@ -66,7 +65,9 @@ class TestCmdAssessmentsCoverage:
     def test_import_json_with_import_errors_prints_warnings(self, app, ids, tmp_path):
         """import-custom-assessments echoes Warning lines when errors are returned (line 115)."""
         variant_name = ids["variant_name"]
+        project_name = ids["project_name"]
 
+        # A statement missing 'status' will trigger an error in _import_statements
         vex_doc = {
             "@context": "https://openvex.dev/ns/v0.2.0",
             "@id": "https://example.com/vex/test",
@@ -75,31 +76,37 @@ class TestCmdAssessmentsCoverage:
             "statements": [
                 {
                     "@id": "s1",
-                    "vulnerability": {"@id": "https://nvd.nist.gov/vuln/detail/CVE-TEST-001"},
+                    "vulnerability": {"name": "CVE-TEST-001"},
                     "products": [{"@id": "pkg:generic/testpkg@1.0"}],
-                    "status": "not_affected",
+                    # 'status' intentionally omitted to trigger an error entry
                 }
             ],
         }
         json_file = tmp_path / f"{variant_name}.json"
         json_file.write_text(json.dumps(vex_doc))
 
-        # Simulate import returning one error entry
-        with patch("src.helpers.assessment_io.import_statements") as mock_import:
-            mock_import.return_value = ([], [{"stmt": "s1", "error": "parse error"}], 0)
-            runner = app.test_cli_runner()
-            result = runner.invoke(args=["import-custom-assessments", str(json_file)])
+        runner = app.test_cli_runner()
+        result = runner.invoke(args=[
+            "import-custom-assessments",
+            "--project", project_name,
+            "--variant", variant_name,
+            str(json_file),
+        ])
 
         assert result.exit_code == 0
         assert "Warning:" in result.output
 
-    def test_import_unsupported_extension_exits(self, app, tmp_path):
+    def test_import_unsupported_extension_exits(self, app, ids, tmp_path):
         """Unsupported file extension (not .json or .tar.gz) exits with code 1."""
         bad_file = tmp_path / "assessments.csv"
         bad_file.write_text("data")
 
         runner = app.test_cli_runner()
-        result = runner.invoke(args=["import-custom-assessments", str(bad_file)])
+        result = runner.invoke(args=[
+            "import-custom-assessments",
+            "--project", ids["project_name"],
+            str(bad_file),
+        ])
 
         assert result.exit_code != 0
         assert "unsupported file type" in result.output

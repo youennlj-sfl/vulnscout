@@ -10,17 +10,20 @@ import tarfile
 import uuid as _uuid
 import os
 from flask.cli import with_appcontext
+from ..controllers.projects import ProjectController
 from ..helpers.assessment_io import (
-    build_openvex_archive,
     is_openvex_doc,
-    import_statements as _import_openvex_statements,
     build_variant_by_name_map,
-    import_archive_bytes,
 )
-from ..models.assessment import Assessment as DBAssessment
+from ..models.assessment import Assessment as DBAssessment, STATUS_TO_SIMPLIFIED
 from ..models.variant import Variant as DBVariant
+from ..models.vulnerability import Vulnerability as DBVuln
+from ..models.package import Package
+from ..models.finding import Finding
+from ..extensions import db as _db
 from datetime import datetime as _dt, timezone as _tz
 from collections import defaultdict
+
 
 @click.command("export-custom-assessments")
 @click.option("--output-dir", default="/scan/outputs", show_default=True,
@@ -62,7 +65,6 @@ def export_custom_assessments_command(output_dir: str, project: str, variant: st
         click.echo("No custom assessments to export.", err=True)
         raise SystemExit(1)
 
-    archive_bytes = build_openvex_archive(handmade, variant_names, author)
     os.makedirs(output_dir, exist_ok=True)
 
     def generate_doc(assessments: list[DBAssessment]) -> dict:
@@ -155,7 +157,7 @@ def export_custom_assessments_command(output_dir: str, project: str, variant: st
 
     if variant is None:
         # export all variants from project as archive
-        by_variant: dict[uuid.UUID, list[DBAssessment]] = defaultdict(list)
+        by_variant: dict[_uuid.UUID, list[DBAssessment]] = defaultdict(list)
         for assess in handmade:
             by_variant[assess.variant_id].append(assess)
 
@@ -189,6 +191,7 @@ def export_custom_assessments_command(output_dir: str, project: str, variant: st
             _json.dump(doc, file)
 
     click.echo(f"Custom assessments exported: {out_path}")
+
 
 @click.command("import-custom-assessments")
 @click.argument("file_path")
@@ -335,62 +338,58 @@ def import_custom_assessments_command(file_path: str, project: str, variant: str
             raise SystemExit(1)
 
         try:
-            with open(file_path, "rb") as fh:
-                archive_bytes = fh.read()
-            total_created, total_errors, total_skipped, found = import_archive_bytes(
-                archive_bytes, variant_by_name
-            )
-        except ValueError:
+            with tarfile.open(file_path, "r:gz") as tar:
+                variant_files_found = 0
+                total_created = []
+                total_errors = []
+                total_skipped = 0
+                for member in tar.getmembers():
+                    if not member.isfile() or not member.name.endswith(
+                        ".json"
+                    ):
+                        continue
+                    base = os.path.basename(member.name)
+                    variant_name = base[:-len(".json")]
+                    variant_obj = variant_by_name.get(variant_name)
+                    if variant_obj is None:
+                        total_errors.append({
+                            "file": member.name,
+                            "error": (
+                                f"No variant found matching name "
+                                f"'{variant_name}'"
+                            ),
+                        })
+                        continue
+
+                    f = tar.extractfile(member)
+                    if f is None:
+                        continue
+                    try:
+                        doc = _json.load(f)
+                    except Exception:
+                        total_errors.append({
+                            "file": member.name,
+                            "error": "Invalid JSON",
+                        })
+                        continue
+
+                    if not _is_openvex(doc):
+                        total_errors.append({
+                            "file": member.name,
+                            "error": "Not a valid OpenVEX document",
+                        })
+                        continue
+
+                    variant_files_found += 1
+                    c, e, s = _import_statements(
+                        doc["statements"], variant_obj.id
+                    )
+                    total_created.extend(c)
+                    total_errors.extend(e)
+                    total_skipped += s
+        except (tarfile.TarError, OSError):
             click.echo("Error: unable to open tar.gz archive.", err=True)
             raise SystemExit(1)
-
-        variant_files_found = 0
-        for member in tar.getmembers():
-            if not member.isfile() or not member.name.endswith(
-                ".json"
-            ):
-                continue
-            base = os.path.basename(member.name)
-            variant_name = base[:-len(".json")]
-            variant_obj = variant_by_name.get(variant_name)
-            if variant_obj is None:
-                total_errors.append({
-                    "file": member.name,
-                    "error": (
-                        f"No variant found matching name "
-                        f"'{variant_name}'"
-                    ),
-                })
-                continue
-
-            f = tar.extractfile(member)
-            if f is None:
-                continue
-            try:
-                doc = _json.load(f)
-            except Exception:
-                total_errors.append({
-                    "file": member.name,
-                    "error": "Invalid JSON",
-                })
-                continue
-
-            if not _is_openvex(doc):
-                total_errors.append({
-                    "file": member.name,
-                    "error": "Not a valid OpenVEX document",
-                })
-                continue
-
-            variant_files_found += 1
-            c, e, s = _import_statements(
-                doc["statements"], variant_obj.id
-            )
-            total_created.extend(c)
-            total_errors.extend(e)
-            total_skipped += s
-
-        tar.close()
 
         if variant_files_found == 0 and not total_created:
             click.echo(
@@ -421,7 +420,7 @@ def import_custom_assessments_command(file_path: str, project: str, variant: str
 
         try:
             with open(file_path) as fh:
-                data = json.load(fh)
+                data = _json.load(fh)
         except Exception:
             click.echo("Error: invalid JSON file.", err=True)
             raise SystemExit(1)
@@ -430,7 +429,7 @@ def import_custom_assessments_command(file_path: str, project: str, variant: str
             click.echo("Error: not a valid OpenVEX document.", err=True)
             raise SystemExit(1)
 
-        c, e, s = _import_statements(
+        total_created, total_errors, total_skipped = _import_statements(
             data["statements"], variant_obj.id
         )
     else:

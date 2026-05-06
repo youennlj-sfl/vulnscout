@@ -325,9 +325,9 @@ def import_custom_assessments_command(file_path: str, project: str, variant: str
 
     variant_by_name = build_variant_by_name_map()
     basename = os.path.basename(file_path)
-    total_created: list[dict] = []
-    total_errors: list[dict] = []
-    total_skipped = 0
+    total_created: list[dict]
+    total_errors: list[dict]
+    total_skipped: int
 
     if file_path.endswith(".tar.gz") or file_path.endswith(".tgz"):
         if variant:

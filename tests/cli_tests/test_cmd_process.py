@@ -6,10 +6,8 @@ Targets uncovered branches reported by the CI coverage run:
   cmd_process.py – lines 131, 152, 236, 255-256, 302-303, 348, 360-361
 """
 
-import io
 import json
 import pytest
-from contextlib import redirect_stdout
 from unittest.mock import patch, MagicMock
 
 from src.bin.webapp import create_app
@@ -62,25 +60,22 @@ class TestCmdProcessCoverage:
             result = runner.invoke(args=["process"])
         mock_main.assert_called_once()
 
-    def test_populate_observations_no_scan_prints_warning(self, app):
+    def test_populate_observations_no_scan_prints_warning(self, app, capsys):
         """populate_observations(None, …) prints warning and returns early (lines 255-256)."""
         from src.bin.cmd_process import populate_observations
         mock_ctrl = MagicMock()
         mock_ctrl._encountered_this_run = set()
 
-        buf = io.StringIO()
         with app.app_context():
-            with redirect_stdout(buf):
-                populate_observations(None, mock_ctrl)
-        assert "Warning: no scan provided" in buf.getvalue()
+            populate_observations(None, mock_ctrl)
+        assert "Warning: no scan provided" in capsys.readouterr().out
 
-    def test_populate_observations_db_exception_is_warned(self, app):
+    def test_populate_observations_db_exception_is_warned(self, app, capsys):
         """DB error inside populate_observations is caught and printed (lines 302-303)."""
         from src.bin.cmd_process import populate_observations
         mock_ctrl = MagicMock()
         mock_ctrl._encountered_this_run = {"CVE-FAKE"}
 
-        buf = io.StringIO()
         mock_scan = MagicMock()
         mock_scan.id = "fake-scan-id"
 
@@ -88,10 +83,9 @@ class TestCmdProcessCoverage:
             with patch("src.bin.cmd_process._db") as mock_db:
                 mock_db.session.execute.side_effect = RuntimeError("db failure")
                 mock_db.select = _db.select
-                with redirect_stdout(buf):
-                    populate_observations(mock_scan, mock_ctrl)
+                populate_observations(mock_scan, mock_ctrl)
 
-        assert "Warning: could not populate observations table" in buf.getvalue()
+        assert "Warning: could not populate observations table" in capsys.readouterr().out
 
     def test_run_main_interactive_mode_skips_post_treatment(self, app, monkeypatch):
         """_run_main skips post_treatment when INTERACTIVE_MODE=true (line 348)."""
@@ -120,7 +114,7 @@ class TestCmdProcessCoverage:
                 from src.bin.cmd_process import _run_main
                 _run_main()  # Must not raise despite json.dump() failing
 
-    def test_read_inputs_unknown_format_prints_warning(self, app, tmp_path):
+    def test_read_inputs_unknown_format_prints_warning(self, app, tmp_path, capsys):
         """read_inputs prints a warning for docs with unrecognisable format (line 152)."""
         from src.bin.cmd_process import read_inputs
         from src.controllers.packages import PackagesController
@@ -147,11 +141,9 @@ class TestCmdProcessCoverage:
                 "assessments": assessCtrl,
             }
 
-            buf = io.StringIO()
-            with redirect_stdout(buf):
-                read_inputs(controllers, scan_id=scan.id)
+            read_inputs(controllers, scan_id=scan.id)
 
-        assert "Warning: unknown format" in buf.getvalue()
+        assert "Warning: unknown format" in capsys.readouterr().out
 
     def test_read_inputs_spdx3_uses_fast_parser(self, app, tmp_path):
         """read_inputs dispatches to FastSPDX3.parse_from_dict for SPDX 3 docs (line 131)."""

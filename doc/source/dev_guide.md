@@ -44,6 +44,17 @@ Or start with inputs and the web UI in one step:
 
 Flask will run with `--debug` when `DEV_MODE=true` is set in the container, enabling auto-reload on Python file changes.
 
+#### Database changes
+
+When editing the database schema, it is necessary to generate **migrations**. We use Alembic for that.
+
+Instead of manually writing the migration code, we can take advantage of the auto-generation feature of Alembic.
+For this, run the backend in dev mode and run the following:
+```bash
+docker exec vulnscout \
+  flask --app src.bin.webapp db migrate -m "your migration title"
+```
+
 ### Modify the Frontend
 
 By default, the `frontend/` directory is not mounted into the container. To get hot-reload for frontend changes, run VulnScout in dev mode — this starts the backend container and a Vite dev server on the host side:

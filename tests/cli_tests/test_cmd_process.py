@@ -8,7 +8,6 @@ Targets uncovered branches reported by the CI coverage run:
 
 import io
 import json
-import os
 import pytest
 from contextlib import redirect_stdout
 from unittest.mock import patch, MagicMock
@@ -38,17 +37,14 @@ def _build_db(app):
 
 
 @pytest.fixture()
-def app(tmp_path):
+def app(tmp_path, monkeypatch):
     scan_file = tmp_path / "scan_status.txt"
     scan_file.write_text("__END_OF_SCAN_SCRIPT__")
-    os.environ["FLASK_SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
-    try:
-        application = create_app()
-        application.config.update({"TESTING": True, "SCAN_FILE": str(scan_file)})
-        _build_db(application)
-        yield application
-    finally:
-        os.environ.pop("FLASK_SQLALCHEMY_DATABASE_URI", None)
+    monkeypatch.setenv("FLASK_SQLALCHEMY_DATABASE_URI", "sqlite:///:memory:")
+    application = create_app()
+    application.config.update({"TESTING": True, "SCAN_FILE": str(scan_file)})
+    _build_db(application)
+    yield application
 
 
 # ---------------------------------------------------------------------------
@@ -97,38 +93,32 @@ class TestCmdProcessCoverage:
 
         assert "Warning: could not populate observations table" in buf.getvalue()
 
-    def test_run_main_interactive_mode_skips_post_treatment(self, app):
+    def test_run_main_interactive_mode_skips_post_treatment(self, app, monkeypatch):
         """_run_main skips post_treatment when INTERACTIVE_MODE=true (line 348)."""
+        monkeypatch.setenv("INTERACTIVE_MODE", "true")
         with patch("src.bin.cmd_process.post_treatment") as mock_pt, \
              patch("src.bin.cmd_process.read_inputs") as mock_ri, \
              patch("src.bin.cmd_process.populate_observations"):
             mock_ri.return_value = {}
-            os.environ["INTERACTIVE_MODE"] = "true"
-            try:
-                with app.app_context():
-                    from src.bin.cmd_process import _run_main
-                    _run_main()
-            finally:
-                os.environ.pop("INTERACTIVE_MODE", None)
+            with app.app_context():
+                from src.bin.cmd_process import _run_main
+                _run_main()
         mock_pt.assert_not_called()
 
-    def test_run_main_json_cache_write_exception_swallowed(self, app):
+    def test_run_main_json_cache_write_exception_swallowed(self, app, monkeypatch):
         """IO error writing JSON cache is silently swallowed (lines 360-361)."""
         import json as _json_mod
 
+        monkeypatch.setenv("MATCH_CONDITION", "cvss > 5")
         with patch("src.bin.cmd_process.read_inputs") as mock_ri, \
              patch("src.bin.cmd_process.post_treatment"), \
              patch("src.bin.cmd_process.populate_observations"), \
              patch("src.bin.cmd_process.evaluate_condition", return_value=[]), \
              patch.object(_json_mod, "dump", side_effect=OSError("disk full")):
             mock_ri.return_value = {}
-            os.environ["MATCH_CONDITION"] = "cvss > 5"
-            try:
-                with app.app_context():
-                    from src.bin.cmd_process import _run_main
-                    _run_main()  # Must not raise despite json.dump() failing
-            finally:
-                os.environ.pop("MATCH_CONDITION", None)
+            with app.app_context():
+                from src.bin.cmd_process import _run_main
+                _run_main()  # Must not raise despite json.dump() failing
 
     def test_read_inputs_unknown_format_prints_warning(self, app, tmp_path):
         """read_inputs prints a warning for docs with unrecognisable format (line 152)."""

@@ -7,7 +7,6 @@ Targets uncovered branches reported by the CI coverage run:
 """
 
 import json
-import os
 import pytest
 from unittest.mock import patch
 
@@ -41,18 +40,15 @@ def _build_db(app):
 
 
 @pytest.fixture()
-def app(tmp_path):
+def app(tmp_path, monkeypatch):
     scan_file = tmp_path / "scan_status.txt"
     scan_file.write_text("__END_OF_SCAN_SCRIPT__")
-    os.environ["FLASK_SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
-    try:
-        application = create_app()
-        application.config.update({"TESTING": True, "SCAN_FILE": str(scan_file)})
-        ids = _build_db(application)
-        application._test_ids = ids
-        yield application
-    finally:
-        os.environ.pop("FLASK_SQLALCHEMY_DATABASE_URI", None)
+    monkeypatch.setenv("FLASK_SQLALCHEMY_DATABASE_URI", "sqlite:///:memory:")
+    application = create_app()
+    application.config.update({"TESTING": True, "SCAN_FILE": str(scan_file)})
+    ids = _build_db(application)
+    application._test_ids = ids
+    yield application
 
 
 @pytest.fixture()

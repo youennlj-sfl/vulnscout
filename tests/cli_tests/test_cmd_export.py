@@ -27,17 +27,14 @@ def _build_db(app):
 
 
 @pytest.fixture()
-def app(tmp_path):
+def app(tmp_path, monkeypatch):
     scan_file = tmp_path / "scan_status.txt"
     scan_file.write_text("__END_OF_SCAN_SCRIPT__")
-    os.environ["FLASK_SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
-    try:
-        application = create_app()
-        application.config.update({"TESTING": True, "SCAN_FILE": str(scan_file)})
-        _build_db(application)
-        yield application
-    finally:
-        os.environ.pop("FLASK_SQLALCHEMY_DATABASE_URI", None)
+    monkeypatch.setenv("FLASK_SQLALCHEMY_DATABASE_URI", "sqlite:///:memory:")
+    application = create_app()
+    application.config.update({"TESTING": True, "SCAN_FILE": str(scan_file)})
+    _build_db(application)
+    yield application
 
 
 # ---------------------------------------------------------------------------
@@ -113,61 +110,52 @@ class TestCmdExportCoverage:
         assert out_file.read_bytes() == b"<html>test</html>"
         assert "Report written" in result.output
 
-    def test_report_generate_documents_env_adds_extra_templates(self, app, tmp_path):
+    def test_report_generate_documents_env_adds_extra_templates(self, app, tmp_path, monkeypatch):
         """GENERATE_DOCUMENTS env var causes extra templates to be rendered (line 145)."""
+        monkeypatch.setenv("GENERATE_DOCUMENTS", "extra.adoc, also_extra.adoc")
         with patch("src.views.templates.Templates.render") as mock_render:
             mock_render.return_value = "rendered content"
-            os.environ["GENERATE_DOCUMENTS"] = "extra.adoc, also_extra.adoc"
-            try:
-                runner = app.test_cli_runner()
-                result = runner.invoke(args=[
-                    "report", "main.adoc", "--output-dir", str(tmp_path)
-                ])
-            finally:
-                os.environ.pop("GENERATE_DOCUMENTS", None)
+            runner = app.test_cli_runner()
+            result = runner.invoke(args=[
+                "report", "main.adoc", "--output-dir", str(tmp_path)
+            ])
 
         # main.adoc + 2 extras = 3 renders
         assert mock_render.call_count == 3
         assert result.output.count("Report written") == 3
 
-    def test_report_match_condition_invalid_cache_falls_back(self, app, tmp_path):
+    def test_report_match_condition_invalid_cache_falls_back(self, app, tmp_path, monkeypatch):
         """Invalid cache JSON causes fallback to evaluate_condition (lines 122-125)."""
         cache_path = "/tmp/vulnscout_matched_vulns.json"
         with open(cache_path, "w") as f:
             f.write("{{not-valid-json")
         try:
+            monkeypatch.setenv("MATCH_CONDITION", "cvss > 5")
             with patch("src.views.templates.Templates.render") as mock_render, \
                  patch("src.bin.cmd_export.evaluate_condition") as mock_eval:
                 mock_render.return_value = "rendered"
                 mock_eval.return_value = []
-                os.environ["MATCH_CONDITION"] = "cvss > 5"
-                try:
-                    runner = app.test_cli_runner()
-                    result = runner.invoke(args=[
-                        "report", "report.adoc", "--output-dir", str(tmp_path)
-                    ])
-                finally:
-                    os.environ.pop("MATCH_CONDITION", None)
+                runner = app.test_cli_runner()
+                result = runner.invoke(args=[
+                    "report", "report.adoc", "--output-dir", str(tmp_path)
+                ])
             mock_eval.assert_called_once()
         finally:
             if os.path.exists(cache_path):
                 os.remove(cache_path)
 
-    def test_report_match_condition_no_cache_calls_evaluate(self, app, tmp_path):
+    def test_report_match_condition_no_cache_calls_evaluate(self, app, tmp_path, monkeypatch):
         """Absent cache file causes evaluate_condition to be called (line 125)."""
         cache_path = "/tmp/vulnscout_matched_vulns.json"
         if os.path.exists(cache_path):
             os.remove(cache_path)
+        monkeypatch.setenv("MATCH_CONDITION", "cvss > 7")
         with patch("src.views.templates.Templates.render") as mock_render, \
              patch("src.bin.cmd_export.evaluate_condition") as mock_eval:
             mock_render.return_value = "rendered"
             mock_eval.return_value = ["CVE-1234-5678"]
-            os.environ["MATCH_CONDITION"] = "cvss > 7"
-            try:
-                runner = app.test_cli_runner()
-                result = runner.invoke(args=[
-                    "report", "report.adoc", "--output-dir", str(tmp_path)
-                ])
-            finally:
-                os.environ.pop("MATCH_CONDITION", None)
+            runner = app.test_cli_runner()
+            result = runner.invoke(args=[
+                "report", "report.adoc", "--output-dir", str(tmp_path)
+            ])
         mock_eval.assert_called_once()

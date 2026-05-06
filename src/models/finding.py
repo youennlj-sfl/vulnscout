@@ -9,10 +9,7 @@ from ..helpers.verbose import verbose
 from .package import Package
 
 if TYPE_CHECKING:
-    from .time_estimate import TimeEstimate  # noqa: F811
-    from .vulnerability import Vulnerability
-    from .observation import Observation
-    from .assessment import Assessment
+    from ..models import TimeEstimate, Vulnerability, Observation, Assessment
 
 
 class Finding(Base):
@@ -20,9 +17,11 @@ class Finding(Base):
 
     __tablename__ = "findings"
 
-    id = db.Column(db.Uuid, primary_key=True, default=uuid.uuid4)
-    package_id = db.Column(db.Uuid, db.ForeignKey("packages.id"), nullable=False, index=True)
-    vulnerability_id = db.Column(db.String(50), db.ForeignKey("vulnerabilities.id"), nullable=False, index=True)
+    id: Mapped[uuid.UUID] = db.Column(db.Uuid, primary_key=True, default=uuid.uuid4)
+    package_id: Mapped[uuid.UUID] = db.Column(db.Uuid, db.ForeignKey("packages.id"), nullable=False, index=True)
+    vulnerability_id: Mapped[str] = db.Column(
+        db.String(50), db.ForeignKey("vulnerabilities.id"), nullable=False, index=True
+    )
 
     __table_args__ = (
         db.UniqueConstraint("package_id", "vulnerability_id", name="uq_finding_package_vulnerability"),

@@ -4,7 +4,8 @@
 import uuid
 import typing
 
-from sqlalchemy.orm import Mapped, relationship
+from sqlalchemy.orm import Mapped, relationship, mapped_column
+from sqlalchemy import ForeignKey
 
 from ..extensions import db, Base
 
@@ -18,9 +19,9 @@ class Observation(Base):
 
     __tablename__ = "observations"
 
-    id: Mapped[uuid.UUID] = db.Column(db.Uuid, primary_key=True, default=uuid.uuid4)
-    finding_id: Mapped[uuid.UUID] = db.Column(db.Uuid, db.ForeignKey("findings.id"), nullable=False, index=True)
-    scan_id: Mapped[uuid.UUID] = db.Column(db.Uuid, db.ForeignKey("scans.id"), nullable=False, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    finding_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("findings.id"), nullable=False, index=True)
+    scan_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("scans.id"), nullable=False, index=True)
 
     scan: Mapped["Scan"] = relationship("Scan", back_populates="observations")
     finding: Mapped["Finding"] = relationship("Finding", back_populates="observations")

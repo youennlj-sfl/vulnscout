@@ -21,7 +21,6 @@ from ..controllers.assessments import AssessmentsController
 from ..extensions import db, batch_session
 from ..models.scan import Scan as ScanModel
 from ..helpers.verbose import verbose
-from ._scan_queries import _packages_by_scan_ids
 
 
 # Tracks in-progress SBOM uploads: upload_id → {status, message, ts}

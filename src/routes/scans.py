@@ -177,6 +177,9 @@ def init_app(app):
         is_tool_scan = scan_type == "tool"
         scan_origin = _origin_for_scan(scan)
 
+        # Load previous scan once (reused for findings diff, SBOM diff, and assessments)
+        _prev_scan = _load_scan_with_findings(prev_scan_id) if prev_scan_id else None
+
         # --- Findings diff ---
         current_finding_ids = {obs.finding_id for obs in scan.observations}
         curr_vulns = {obs.finding.vulnerability_id for obs in scan.observations}
@@ -204,15 +207,11 @@ def init_app(app):
                 for obs in scan.observations if obs.finding_id in added_fids
             ]
             # Removed findings come from the previous same-source scan
-            if prev_scan_id:
-                _prev_loaded = _load_scan_with_findings(prev_scan_id)
-                _prev_origin = (
-                    _origin_for_scan(_prev_loaded) if _prev_loaded
-                    else scan_origin
-                )
+            if _prev_scan:
+                _prev_origin = _origin_for_scan(_prev_scan)
                 findings_removed = [
                     _obs_to_dict(obs, _prev_origin)
-                    for obs in (_prev_loaded.observations if _prev_loaded else [])
+                    for obs in _prev_scan.observations
                     if obs.finding_id in removed_fids
                 ]
             else:
@@ -225,9 +224,8 @@ def init_app(app):
             vulns_added = sorted(curr_vulns)
             vulns_removed: list = []
         else:
-            prev_scan = _load_scan_with_findings(prev_scan_id)
-            prev_finding_ids = {obs.finding_id for obs in prev_scan.observations} if prev_scan else set()
-            prev_vulns = {obs.finding.vulnerability_id for obs in prev_scan.observations} if prev_scan else set()
+            prev_finding_ids = {obs.finding_id for obs in _prev_scan.observations} if _prev_scan else set()
+            prev_vulns = {obs.finding.vulnerability_id for obs in _prev_scan.observations} if _prev_scan else set()
             added_fids = current_finding_ids - prev_finding_ids
             removed_fids = prev_finding_ids - current_finding_ids
             findings_added = [
@@ -235,8 +233,8 @@ def init_app(app):
                 for obs in scan.observations if obs.finding_id in added_fids
             ]
             findings_removed = (
-                [_obs_to_dict(obs, scan_origin) for obs in prev_scan.observations if obs.finding_id in removed_fids]
-                if prev_scan else []
+                [_obs_to_dict(obs, scan_origin) for obs in _prev_scan.observations if obs.finding_id in removed_fids]
+                if _prev_scan else []
             )
             vulns_added = sorted(curr_vulns - prev_vulns)
             vulns_removed = sorted(prev_vulns - curr_vulns)
@@ -292,7 +290,7 @@ def init_app(app):
             curr_sr_fids, curr_sr_vids, _ = _global_result_id_sets(
                 scan, latest_tool, filter_tool_by_sbom_pkgs=True)
             prev_sr_fids, prev_sr_vids, _ = _global_result_id_sets(
-                prev_scan, latest_tool,  # type: ignore[possibly-undefined]
+                _prev_scan, latest_tool,
                 filter_tool_by_sbom_pkgs=True)
 
             # Build finding_id → (obs_dict, origin) lookup for full output.
@@ -303,7 +301,7 @@ def init_app(app):
                 fid = obs.finding_id
                 fid_obs_map[fid] = _obs_to_dict(obs, scan_origin)
                 fid_info[fid] = (obs.finding.package_id, obs.finding.vulnerability_id)
-            for obs in prev_scan.observations:  # type: ignore[possibly-undefined]
+            for obs in (_prev_scan.observations if _prev_scan else []):
                 fid = obs.finding_id
                 if fid not in fid_obs_map:
                     fid_obs_map[fid] = _obs_to_dict(obs, scan_origin)
@@ -487,9 +485,6 @@ def init_app(app):
                 if _next_scan_ts is None or s.timestamp < _next_scan_ts:
                     _next_scan_ts = s.timestamp
         # Locate previous scan object for removed-assessment computation
-        _prev_scan = None
-        if prev_scan_id:
-            _prev_scan = _load_scan_with_findings(prev_scan_id)
         assess_detail = _assessments_detail_for_scan(
             scan, next_scan_ts=_next_scan_ts, prev_scan=_prev_scan
         )

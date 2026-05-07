@@ -138,14 +138,7 @@ type GlobalResultVuln = {
     sources: string[];
 };
 
-type GlobalResultAssessment = {
-    vulnerability_id: string;
-    status: string;
-    simplified_status: string;
-    justification: string;
-    impact_statement: string;
-    status_notes: string;
-};
+type GlobalResultAssessment = AssessmentDiffEntry;
 
 type GlobalResult = {
     scan_id: string;

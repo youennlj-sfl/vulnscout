@@ -138,7 +138,7 @@ function FindingUpgradeDiffTable({ entries, label, colorClass }: {
                 </h3>
                 <input
                     type="text"
-                    placeholder="Filter&#x2026;"
+                    placeholder="Filter\u2026"
                     value={filter}
                     onChange={e => setFilter(e.target.value)}
                     className="text-xs px-2 py-1 rounded border border-gray-600 bg-gray-800 text-gray-200 w-48"
@@ -201,7 +201,7 @@ function PackageDiffTable({ entries, label, colorClass }: {
                 {entries.length > 10 && (
                     <input
                         type="text"
-                        placeholder="Filter…"
+                        placeholder="Filter\u2026"
                         value={filter}
                         onChange={e => setFilter(e.target.value)}
                         className="text-xs px-2 py-1 rounded border border-gray-600 bg-gray-800 text-gray-200 w-48"
@@ -260,7 +260,7 @@ function PackageUpgradeDiffTable({ entries, label, colorClass }: {
                 {entries.length > 10 && (
                     <input
                         type="text"
-                        placeholder="Filter…"
+                        placeholder="Filter\u2026"
                         value={filter}
                         onChange={e => setFilter(e.target.value)}
                         className="text-xs px-2 py-1 rounded border border-gray-600 bg-gray-800 text-gray-200 w-48"
@@ -297,10 +297,10 @@ function PackageUpgradeDiffTable({ entries, label, colorClass }: {
     );
 }
 
-function AssessmentDiffTable({ entries, label, colorClass }: {
+function AssessmentDiffTable({ entries, label, colorClass = "text-white" }: {
     entries: AssessmentDiffEntry[];
     label: string;
-    colorClass: string;
+    colorClass?: string;
 }) {
     const [filter, setFilter] = useState('');
     const filtered = filter
@@ -322,7 +322,7 @@ function AssessmentDiffTable({ entries, label, colorClass }: {
                 </h3>
                 <input
                     type="text"
-                    placeholder="Filter&#x2026;"
+                    placeholder="Filter\u2026"
                     value={filter}
                     onChange={e => setFilter(e.target.value)}
                     className="text-xs px-2 py-1 rounded border border-gray-600 bg-gray-800 text-gray-200 w-48"
@@ -384,7 +384,7 @@ function VulnDiffList({ vulns, label, colorClass, originMap }: {
                 {vulns.length > 10 && (
                     <input
                         type="text"
-                        placeholder="Filter…"
+                        placeholder="Filter\u2026"
                         value={filter}
                         onChange={e => setFilter(e.target.value)}
                         className="text-xs px-2 py-1 rounded border border-gray-600 bg-gray-800 text-gray-200 w-48"
@@ -513,7 +513,7 @@ function GlobalResultModal({ scanId, onClose }: { scanId: string; onClose: () =>
                             <div className="ml-auto">
                                 <input
                                     type="text"
-                                    placeholder="Filter…"
+                                    placeholder="Filter\u2026"
                                     value={filter}
                                     onChange={e => setFilter(e.target.value)}
                                     className="text-xs px-2 py-1 rounded border border-gray-600 bg-gray-800 text-gray-200 w-48"
@@ -601,34 +601,10 @@ function GlobalResultModal({ scanId, onClose }: { scanId: string; onClose: () =>
                         )}
 
                         {data && section === 'assessments' && (
-                            <div className="overflow-auto max-h-[70vh] rounded border border-gray-600">
-                                <table className="w-full text-xs text-left">
-                                    <thead className="sticky top-0 bg-gray-800 text-gray-300 uppercase">
-                                        <tr>
-                                            <th className="px-3 py-2">Vulnerability</th>
-                                            <th className="px-3 py-2">Status</th>
-                                            <th className="px-3 py-2">Justification</th>
-                                            <th className="px-3 py-2">Impact</th>
-                                            <th className="px-3 py-2">Notes</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredAssessments.map((a, i) => (
-                                            <tr key={`${a.vulnerability_id}-${i}`} className="border-t border-gray-600 hover:bg-gray-600/40">
-                                                <td className="px-3 py-1.5 font-mono">{a.vulnerability_id}</td>
-                                                <td className="px-3 py-1.5">
-                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-600 text-gray-200">
-                                                        {a.simplified_status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 py-1.5 text-gray-400">{a.justification}</td>
-                                                <td className="px-3 py-1.5 text-gray-400">{a.impact_statement}</td>
-                                                <td className="px-3 py-1.5 text-gray-400">{a.status_notes}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                            <AssessmentDiffTable
+                                entries={filteredAssessments}
+                                label="Active assessments"
+                            />
                         )}
                     </div>
 

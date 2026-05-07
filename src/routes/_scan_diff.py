@@ -307,21 +307,6 @@ def _global_result_id_sets(
     return global_fids, global_vids, sbom_pkg_ids
 
 
-def _global_result_counts(
-    scan: Scan,
-    all_variant_scans: list[Scan],
-) -> tuple:
-    """Compute (finding_count, vuln_count, package_count) for the global
-    result at *scan* using batch DB queries.
-
-    The global result is: SBOM packages/findings ∪ all tool findings.
-    """
-    sbom_scan, latest_tool = _contributing_scans_at(scan, all_variant_scans)
-    fids, vids, pkg_ids = _global_result_id_sets(
-        sbom_scan, latest_tool, filter_tool_by_sbom_pkgs=True)
-    return len(fids), len(vids), len(pkg_ids)
-
-
 def _global_assessment_ids_for(
     sbom_scan,
     latest_tool: dict,
@@ -891,7 +876,10 @@ def _serialize_list_with_diff(scans: list[Scan]) -> list[dict]:
             )
             if has_tool_scans:
                 variant_scans = _scans_by_variant.get(scan.variant_id, [])
-                g_f, g_v, g_p = _global_result_counts(scan, variant_scans)
+                sbom_scan, latest_tool = _contributing_scans_at(scan, variant_scans)
+                fids, vids, pkg_ids = _global_result_id_sets(
+                    sbom_scan, latest_tool, filter_tool_by_sbom_pkgs=True)
+                g_f, g_v, g_p = len(fids), len(vids), len(pkg_ids)
                 base["global_finding_count"] = g_f
                 base["global_vuln_count"] = g_v
                 base["global_package_count"] = g_p

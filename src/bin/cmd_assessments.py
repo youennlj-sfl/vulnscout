@@ -159,6 +159,7 @@ def export_custom_assessments_command(output_dir: str, project: str, variant: st
         # export all variants from project as archive
         by_variant: dict[_uuid.UUID, list[DBAssessment]] = defaultdict(list)
         for assess in handmade:
+            assert assess.variant_id is not None
             by_variant[assess.variant_id].append(assess)
 
         buf = io.BytesIO()

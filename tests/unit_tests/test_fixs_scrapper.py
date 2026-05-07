@@ -5,7 +5,6 @@
 
 import pytest
 from src.helpers.fixs_scrapper import FixsScrapper
-from src.models.vulnerability import Vulnerability
 import json
 
 
@@ -203,33 +202,3 @@ def test_all_cve_scan(ex_nvd_simple, ex_nvd_start_end, ex_nvd_inversed, ex_nvd_n
     assert "whatsup_gold (nvd-cpe-match)" in soluces
     assert len(soluces["whatsup_gold (nvd-cpe-match)"]["fix"]) == 5
     assert len(soluces["x11r6 (nvd-cpe-match)"]["affected"]) == 3
-
-
-def test_find_in_text():
-    vuln = Vulnerability("CVE-0000-00000", "test", "demo", "demo")
-    vuln.add_package("abc@1.0.0")
-    vuln.add_text(
-        "A security issue in main.c affecting version prior to 1.2.3 can lead to remote code execution",
-        "test1"
-    )
-    vuln.add_text("All versions after 2.0 through 2.4.2 are affected", "test2")
-    vuln.add_text("A temporary patch was released in version 3.2.7 and 3.3.2", "test3")
-    fxs = FixsScrapper()
-    fxs.search_in_vulnerability(vuln)
-
-    assert len(fxs.list_fixing_versions()) == 5
-    assert [
-        "abc >=? 1.2.3",
-        "abc <? 2.0",
-        "abc >? 2.4.2",
-        "abc ? 3.2.7",
-        "abc ? 3.3.2"
-    ] == fxs.list_fixing_versions()
-    assert len(fxs.list_vulnerables_versions()) == 5
-    assert [
-        "abc <? 1.2.3",
-        "abc >=? 2.0",
-        "abc <=? 2.4.2",
-        "abc ? 3.2.7",
-        "abc ? 3.3.2"
-    ] == fxs.list_vulnerables_versions()

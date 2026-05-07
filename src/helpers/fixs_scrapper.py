@@ -1,7 +1,6 @@
 # Copyright (C) 2026 Savoir-faire Linux, Inc.
 # SPDX-License-Identifier: GPL-3.0-only
 
-from ..models.vulnerability import Vulnerability
 import re
 from typing import Optional
 
@@ -39,34 +38,6 @@ class FixsScrapper:
 
     def __init__(self):
         self.solutions: list[FixSolution] = []
-
-    def search_in_vulnerability(self, vulnerability: Vulnerability):
-        """
-        Search in a vulnerability description / texts to find a fix or solution
-        """
-        for title in vulnerability.texts:
-            matchs = re.findall(self.semver_regex, vulnerability.texts[title])
-            for match in matchs:
-                context = match[0]
-                new_version = f"{match[1]}.{match[2]}"
-                if len(match) >= 5 and match[4] != '':
-                    new_version += f".{match[4]}"
-                for pkg in vulnerability.packages:
-                    pkg_parts = pkg.split("@")
-                    artifact = FixSolution(pkg_parts[0], "local-description-regex")
-                    if context == "before" or context == "prior to":
-                        artifact.fixed.append(f">=? {new_version}")
-                        artifact.vulnerables.append(f"<? {new_version}")
-                    elif context == "through":
-                        artifact.fixed.append(f">? {new_version}")
-                        artifact.vulnerables.append(f"<=? {new_version}")
-                    elif context == "after" or context == "from":
-                        artifact.fixed.append(f"<? {new_version}")
-                        artifact.vulnerables.append(f">=? {new_version}")
-                    else:
-                        artifact.fixed.append(f"{context}? {new_version}")
-                        artifact.vulnerables.append(f"{context}? {new_version}")
-                    self.solutions.append(artifact)
 
     def _extract_from_criteria(self, criteria: str) -> Optional[tuple[str, str]]:
         """

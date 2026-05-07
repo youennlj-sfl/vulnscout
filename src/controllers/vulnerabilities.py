@@ -5,6 +5,7 @@ import datetime
 import time
 import os
 import json
+import typing
 import urllib.request
 import urllib.error
 from typing import Optional
@@ -137,7 +138,7 @@ class VulnerabilitiesController:
 
     def __init__(self, pkgCtrl: PackagesController):
         """Take an instance of PackagesController to resolve package dependencies as parameter."""
-        self.packagesCtrl = pkgCtrl
+        self.packagesCtrl: PackagesController = pkgCtrl
         self.vulnerabilities: dict[str, Vulnerability] = {}
         """A dictionary of vulnerabilities, indexed by their id."""
         self.alias_registered: dict[str, str] = {}
@@ -204,7 +205,7 @@ class VulnerabilitiesController:
             verbose(f"[VulnerabilitiesController._preload_cache] {e}")
     # ------------------------------------------------------------------
 
-    def get(self, vuln_id: str):
+    def get(self, vuln_id: str) -> Vulnerability | None:
         """Return a vulnerability by id (str) or None if not found. Also look for aliases."""
         if vuln_id in self.vulnerabilities:
             return self.vulnerabilities[vuln_id]
@@ -685,7 +686,7 @@ class VulnerabilitiesController:
         """Return the number of vulnerabilities in the list."""
         return len(self.vulnerabilities)
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator[Vulnerability]:
         """Allow iteration over the list of vulnerabilities.
 
         When the in-memory dict is populated (during scan processing) it is

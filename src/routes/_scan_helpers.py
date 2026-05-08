@@ -12,10 +12,8 @@ import uuid as uuid_module
 from flask import jsonify
 
 from ..controllers.variants import VariantController
-from ..models.scan import Scan
+from ..helpers.active_scans import active_sbom_scan_ids_for_variant, active_package_ids_for_scans
 from ..models.observation import Observation
-from ..models.sbom_document import SBOMDocument
-from ..models.sbom_package import SBOMPackage
 from ..models.package import Package
 from ..extensions import db
 
@@ -120,32 +118,15 @@ def resolve_active_packages(variant_uuid, progress_dict: dict | None = None, vid
     Returns ``(packages, error_string_or_None)``.  When *progress_dict*
     and *vid_str* are provided the function sets an error state on failure.
     """
-    # Find the latest SBOM scan for this variant
-    sbom_row = db.session.execute(
-        db.select(Scan.id)
-        .where(Scan.variant_id == variant_uuid)
-        .where(db.or_(Scan.scan_type == "sbom", Scan.scan_type.is_(None)))
-        .order_by(Scan.timestamp.desc())
-        .limit(1)
-    ).scalar()
+    latest_ids = active_sbom_scan_ids_for_variant(variant_uuid)
 
-    if sbom_row is None:
+    if not latest_ids:
         err = "No SBOM scan found for variant"
         if progress_dict and vid_str:
             set_error(progress_dict, vid_str, err)
         return [], err
 
-    latest_ids = [sbom_row]
-
-    # Batch query: scan_id -> set(package_id) via sbom_documents
-    rows = db.session.execute(
-        db.select(SBOMDocument.scan_id, SBOMPackage.package_id)
-        .join(SBOMPackage, SBOMPackage.sbom_document_id == SBOMDocument.id)
-        .where(SBOMDocument.scan_id.in_(latest_ids))
-    ).all()
-    all_pkg_ids: set = set()
-    for _, pid in rows:
-        all_pkg_ids.add(pid)
+    all_pkg_ids = active_package_ids_for_scans(latest_ids)
 
     if not all_pkg_ids:
         err = "No packages found for variant"

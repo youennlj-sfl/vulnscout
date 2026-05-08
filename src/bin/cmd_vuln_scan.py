@@ -15,7 +15,7 @@ from ..models.cvss import CVSS
 from ..models.assessment import Assessment
 from ..models.package import Package
 from ..extensions import db as _db
-from ..routes._scan_queries import _packages_by_scan_ids
+from ..helpers.active_scans import active_sbom_scan_ids_for_variant, active_package_ids_for_scans
 from .cmd_process import DEFAULT_VARIANT_NAME
 import click
 import os
@@ -43,28 +43,12 @@ def nvd_scan_command(project: str, variant: str | None) -> None:
 
     # 1. Get active packages for this variant
     click.echo("Resolving active packages…")
-    latest_rows = _db.session.execute(
-        _db.select(ScanModel.id, ScanModel.scan_type)
-        .where(ScanModel.variant_id == variant_uuid)
-        .order_by(ScanModel.timestamp.desc())
-    ).all()
-    latest_ids: list = []
-    seen_types: set = set()
-    for sid, stype in latest_rows:
-        st = stype or "sbom"
-        if st not in seen_types:
-            seen_types.add(st)
-            latest_ids.append(sid)
-        if len(seen_types) >= 2:
-            break
+    latest_ids = active_sbom_scan_ids_for_variant(variant_uuid)
 
     if not latest_ids:
         raise click.ClickException("No scans found for variant")
 
-    pkg_sets = _packages_by_scan_ids(latest_ids)
-    all_pkg_ids: set = set()
-    for s in pkg_sets.values():
-        all_pkg_ids |= s
+    all_pkg_ids = active_package_ids_for_scans(latest_ids)
 
     if not all_pkg_ids:
         raise click.ClickException("No packages found for variant")
@@ -266,28 +250,12 @@ def osv_scan_command(project: str, variant: str | None) -> None:
 
     # 1. Get active packages for this variant
     click.echo("Resolving active packages…")
-    latest_rows = _db.session.execute(
-        _db.select(ScanModel.id, ScanModel.scan_type)
-        .where(ScanModel.variant_id == variant_uuid)
-        .order_by(ScanModel.timestamp.desc())
-    ).all()
-    latest_ids: list = []
-    seen_types: set = set()
-    for sid, stype in latest_rows:
-        st = stype or "sbom"
-        if st not in seen_types:
-            seen_types.add(st)
-            latest_ids.append(sid)
-        if len(seen_types) >= 2:
-            break
+    latest_ids = active_sbom_scan_ids_for_variant(variant_uuid)
 
     if not latest_ids:
         raise click.ClickException("No scans found for variant")
 
-    pkg_sets = _packages_by_scan_ids(latest_ids)
-    all_pkg_ids: set = set()
-    for s in pkg_sets.values():
-        all_pkg_ids |= s
+    all_pkg_ids = active_package_ids_for_scans(latest_ids)
 
     if not all_pkg_ids:
         raise click.ClickException("No packages found for variant")

@@ -1,7 +1,7 @@
 """add supplier to packages
 
 Revision ID: i5d6e7f8a9b0
-Revises: h4c5d6e7f8a9
+Revises: g3b4c5d6e7f8
 Create Date: 2026-05-05 00:00:00.000000
 
 """
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = 'i5d6e7f8a9b0'
-down_revision = 'h4c5d6e7f8a9'
+down_revision = 'g3b4c5d6e7f8'
 branch_labels = None
 depends_on = None
 

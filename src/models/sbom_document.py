@@ -4,7 +4,8 @@
 import typing
 import uuid
 
-from sqlalchemy.orm import Mapped, relationship
+from sqlalchemy.orm import Mapped, relationship, mapped_column
+from sqlalchemy import Text, ForeignKey
 
 from ..extensions import db, Base
 from . import Variant, Scan
@@ -18,15 +19,14 @@ class SBOMDocument(Base):
 
     __tablename__ = "sbom_documents"
 
-    id: Mapped[uuid.UUID] = db.Column(db.Uuid, primary_key=True, default=uuid.uuid4)
-    path: Mapped[str] = db.Column(db.Text, nullable=False)
-    source_name: Mapped[str] = db.Column(db.String, nullable=False)
-    format: Mapped[str | None] = db.Column(db.String, nullable=True)  # e.g. 'spdx', 'cdx', 'openvex', 'yocto_cve_check'
-    scan_id: Mapped[uuid.UUID] = db.Column(db.Uuid, db.ForeignKey("scans.id"), nullable=False, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    path: Mapped[str] = mapped_column(Text)
+    source_name: Mapped[str]
+    format: Mapped[str | None]  # e.g. 'spdx', 'cdx', 'openvex', 'yocto_cve_check'
+    scan_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("scans.id"), index=True)
 
     scan: Mapped["Scan"] = relationship("Scan", back_populates="sbom_documents")
     sbom_packages: Mapped[list["SBOMPackage"]] = relationship(
-        "SBOMPackage",
         back_populates="sbom_document",
         cascade="all, delete-orphan",
     )

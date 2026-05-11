@@ -141,10 +141,11 @@ class OpenVex:
                 pkg = self.packagesCtrl.get(pkg_id)
 
                 if pkg is not None:
-                    if len(pkg.cpe) < 1:
+                    if not pkg.cpe:
                         pkg.generate_generic_cpe()
-                    if len(pkg.purl) < 1:
+                    if not pkg.purl:
                         pkg.generate_generic_purl()
+                    assert pkg.cpe and pkg.purl
                     product = {
                         "@id": pkg.purl[0],
                         "identifiers": {

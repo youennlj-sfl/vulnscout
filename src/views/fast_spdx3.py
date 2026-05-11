@@ -317,7 +317,7 @@ class FastSPDX3:
                         vulnerability.add_url(locator)
 
                 if description:
-                    vulnerability.add_text(description, "description")
+                    vulnerability.description = description
 
                 # Register pre-collected CVSS scores so the initial add()
                 # persist includes them, avoiding a separate re-persist pass.

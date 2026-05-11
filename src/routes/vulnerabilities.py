@@ -10,6 +10,7 @@ from ..models import (
     Vulnerability,
     Finding,
     Observation,
+    SBOMObservation,
     Package,
     Scan,
     Variant,
@@ -415,6 +416,16 @@ def init_app(app):
         vuln_ids = vulns.keys()
 
         if vulns:
+            # Update vuln dicts to move description to a "texts" list
+            for vuln in vulns.values():
+                vuln["texts"] = []
+                desc = vuln.pop("description")
+                if desc:
+                    vuln["texts"].append({
+                        "title": "description",
+                        "content": desc
+                    })
+
             # packages_current: packages from the specific scan(s), expanded to include all
             # same-name+version supplier variants present in the active SBOM scans.
             # This ensures that Grype-linked packages (no supplier) also surface SBOM packages.
@@ -499,6 +510,23 @@ def init_app(app):
                 first_scan_by_vuln[str(vuln_id)] = ensure_utc_iso(min_ts)
             for vuln_id, vuln in vulns.items():
                 vuln["first_scan_date"] = first_scan_by_vuln.get(vuln_id)
+
+            # Enrich with observation statuses
+            variant_sbom_observations = db.session.execute(
+                select(SBOMObservation.vulnerability_id, SBOMObservation.key, SBOMObservation.description)
+                .join(SBOMDocument, SBOMObservation.sbom_document_id == SBOMDocument.id)
+                .where(SBOMObservation.vulnerability_id.in_(vuln_ids))
+                .where(SBOMDocument.scan_id.in_(active_scan_ids))
+                .distinct()
+            ).all()
+            for vuln_id, obs_key, obs_desc in variant_sbom_observations:
+                vuln = vulns[vuln_id]
+                # TODO return package for sbom observation
+                vuln["texts"].append({
+                    "title": obs_key,
+                    "content": obs_desc,
+                    "packages": obs_packages.split(";") if obs_packages else None
+                })
 
         match request.args.get('format', 'list'):
             case "list":

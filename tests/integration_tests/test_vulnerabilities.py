@@ -40,7 +40,6 @@ def pkg_controller(pkg_ABC, pkg_XYZ):
 def vuln_123():
     vuln = Vulnerability("CVE-2022-1230", ["test"], "test", "test")
     vuln.add_url("https://cve.com/1230")
-    vuln.add_text("CVE-123", "text1")
     vuln.add_package("test@1.0.0")
     vuln.add_advisory("advisory 1")
     return vuln
@@ -52,7 +51,6 @@ def vuln_456(vuln_123, pkg_ABC):
     vuln.add_alias(vuln_123.id)
     vuln.add_related_vulnerability("CVE-000")
     vuln.add_url("https://cve.com/4560")
-    vuln.add_text("CVE-456", "text2")
     vuln.add_package(pkg_ABC)
     vuln.add_advisory("advisory 2")
     return vuln

@@ -5,12 +5,13 @@ import datetime
 import time
 import os
 import json
+import logging
 import typing
 import urllib.request
 import urllib.error
 from typing import Optional
 
-from ..models.vulnerability import Vulnerability
+from ..models import Vulnerability, Package, SBOMObservation
 from ..controllers.packages import PackagesController
 from ..controllers.epss_db import EPSS_DB
 from ..controllers.nvd_db import NVD_DB
@@ -19,6 +20,8 @@ from ..models.cvss import CVSS
 from ..models.metrics import Metrics as MetricsModel
 from ..extensions import db
 
+
+_logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Remote-refresh delay helpers
@@ -634,6 +637,22 @@ class VulnerabilitiesController:
             flush=True,
         )
 
+    def record_sbom_observation(
+        self, vuln: Vulnerability, key: str, description: str, package: Package | None = None
+    ) -> None:
+        # Need the SBOM Document to know in which scan to make the observation
+        if self.packagesCtrl.current_sbom_document is None:
+            _logger.warning("Cannot add SBOM observation '%s' if no scan is ongoing", key)
+        else:
+            SBOMObservation.create(
+                vulnerability_id=vuln.id,
+                sbom_document_id=self.packagesCtrl.current_sbom_document.id,
+                package_id=package.id if package else None,
+                key=key,
+                description=description,
+                commit=False,
+            )
+
     def to_dict(self) -> dict:
         """Export the list of vulnerabilities preferring in-memory data when available."""
         if self.vulnerabilities:
@@ -714,7 +733,6 @@ class VulnerabilitiesController:
         return {
             "id": record.id,
             "description": record.description,
-            "yocto_description": record.yocto_description,
             "status": record.status,
             "publish_date": record.publish_date.isoformat() if record.publish_date else None,
             "attack_vector": record.attack_vector,
@@ -741,7 +759,6 @@ class VulnerabilitiesController:
     def create_db(
         vuln_id: str,
         description: Optional[str] = None,
-        yocto_description: Optional[str] = None,
         status: Optional[str] = None,
         publish_date: Optional[datetime.date | str] = None,
         attack_vector: Optional[str] = None,
@@ -761,7 +778,6 @@ class VulnerabilitiesController:
         return Vulnerability.create_record(
             id=vuln_id,
             description=description,
-            yocto_description=yocto_description,
             status=status,
             publish_date=safe_date,
             attack_vector=attack_vector,

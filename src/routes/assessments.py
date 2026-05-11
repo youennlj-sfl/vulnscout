@@ -126,7 +126,7 @@ def init_app(app):
         for vid_str in vuln_ids:
             vuln = DBVuln.get_by_id(vid_str)
             if vuln is not None:
-                vuln_texts[vid_str] = dict(vuln.texts or {})
+                vuln_texts[vid_str] = {"description": vuln.description}  # TODO use SBOMObservation
         for a in assessments:
             a["vuln_texts"] = vuln_texts.get(a.get("vuln_id", ""), {})
 

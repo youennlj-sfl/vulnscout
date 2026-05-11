@@ -53,7 +53,7 @@ class OpenVex:
                     continue
                 vuln = Vulnerability(statement["vulnerability"]["name"], found_by, "unknown", "unknown")
                 if "description" in statement["vulnerability"]:
-                    vuln.add_text(statement["vulnerability"]["description"], "description")
+                    vuln.description = statement["vulnerability"]["description"]
                 if "aliases" in statement["vulnerability"]:
                     for alias in statement["vulnerability"]["aliases"]:
                         vuln.add_alias(alias)
@@ -126,10 +126,8 @@ class OpenVex:
                 # Check if there is vulnerability in the dict and if it's "none". If so set a empty dict.
                 if "vulnerability" not in stmt or stmt["vulnerability"] is None:
                     stmt["vulnerability"] = {}
-                if "description" in vuln.texts:
-                    stmt["vulnerability"]["description"] = vuln.texts["description"]
-                elif "summary" in vuln.texts:
-                    stmt["vulnerability"]["description"] = vuln.texts["summary"]
+                if vuln.description:
+                    stmt["vulnerability"]["description"] = vuln.description
                 stmt["vulnerability"]["aliases"] = vuln.aliases
                 if vuln.datasource.startswith("http"):
                     stmt["vulnerability"]["@id"] = vuln.datasource

@@ -12,7 +12,6 @@ from src.models.assessment import Assessment
 from src.controllers.packages import PackagesController
 from src.controllers.vulnerabilities import VulnerabilitiesController
 from src.controllers.assessments import AssessmentsController
-import subprocess
 
 
 @pytest.fixture
@@ -35,7 +34,7 @@ def pkg_ABC():
 def vuln_123():
     vuln = Vulnerability("CVE-1234-000", ["scanner"], "https://nvd.nist.gov/vuln/detail/CVE-1234-000", "unknown")
     vuln.add_package("abc@1.2.3")
-    vuln.add_text("A flaw was found in abc's image-compositor.c (...)", "description")
+    vuln.description = "A flaw was found in abc's image-compositor.c (...)"
     vuln.add_alias("CVE-1234-999")
     vuln.set_epss(0.5, 0.97)
     vuln.severity_without_cvss("medium", 5.4, True)
@@ -88,7 +87,7 @@ class TestTemplatesRenderExceptions:
 
         with patch.object(templates_instance.env, 'get_template') as mock_template:
             mock_template.return_value.render.return_value = "test"
-            
+
             # Test with a filter date that includes the assessment
             result = templates_instance.render("test.jinja2", ignore_before="2020-01-01T00:00")
             assert result == "test"
@@ -148,7 +147,7 @@ class TestAdocToHtmlErrors:
         mock_result.stdout = b"stdout output"
         mock_result.stderr = b"stderr output"
         mock_subprocess.return_value = mock_result
-        
+
         # Mock that both files exist for cleanup
         mock_exists.return_value = True
 
@@ -211,7 +210,7 @@ class TestFilterEpssScoreException:
         ]
 
         result = TemplatesExtensions.filter_epss_score(vulns, 50)
-        
+
         # Should only include CVE-2 which has valid EPSS >= 50%
         assert len(result) == 1
         assert result[0]["id"] == "CVE-2"
@@ -225,7 +224,7 @@ class TestFilterEpssScoreException:
         }
 
         result = TemplatesExtensions.filter_epss_score(vulns_dict, 50)
-        
+
         # Should only include CVE-2
         assert len(result) == 1
         assert result[0]["id"] == "CVE-2"
@@ -241,9 +240,9 @@ class TestFilterAsListMethod:
             "key2": {"id": "value2"},
             "key3": {"id": "value3"}
         }
-        
+
         result = TemplatesExtensions.filter_as_list(test_dict)
-        
+
         assert isinstance(result, list)
         assert len(result) == 3
         assert {"id": "value1"} in result

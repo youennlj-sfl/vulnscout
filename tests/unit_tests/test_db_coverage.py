@@ -275,7 +275,7 @@ class TestVulnerabilityPersistFromTransient:
         from src.models.cvss import CVSS
         v = Vulnerability("CVE-2025-1111", ["grype"], "https://nvd.nist.gov", "nvd:cpe")
         v.add_url("https://nvd.nist.gov/vuln/detail/CVE-2025-1111")
-        v.add_text("A test vulnerability for coverage.", "description")
+        v.description = "A test vulnerability for coverage."
         v.add_alias("GHSA-test-1111")
         v.add_package(pkg_id)
         v.severity_label = "high"
@@ -1255,4 +1255,3 @@ class TestVulnerabilitiesController:
             "published transient should be initialised from publish_date on DB load"
         )
         assert fresh.to_dict()["published"] == "2024-03-15"
-

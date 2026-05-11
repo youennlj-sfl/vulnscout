@@ -204,12 +204,20 @@ class CycloneDx:
                 elif rating.severity:
                     vuln.severity_without_cvss(rating.severity, rating.score, False)
 
-            if vulnerability.description:
-                vuln.add_text(vulnerability.description, "description")
+            desc: str = vulnerability.description
             if vulnerability.detail:
-                vuln.add_text(vulnerability.detail, "detail")
+                self.vulnerabilitiesCtrl.record_sbom_observation(
+                    vuln,
+                    key="CycloneDX Details",
+                    description=vulnerability.detail,
+                )
             if vulnerability.recommendation:
-                vuln.add_text(vulnerability.recommendation, "recommendation")
+                self.vulnerabilitiesCtrl.record_sbom_observation(
+                    vuln,
+                    key="CycloneDX Recommendation",
+                    description=vulnerability.recommendation,
+                )
+            vuln.description = desc
 
             for advisory in vulnerability.advisories:
                 vuln.add_url(str(advisory.url))
@@ -311,9 +319,7 @@ class CycloneDx:
                     name=vuln.namespace,
                     url=vuln.datasource
                 ),
-                description=vuln.texts.get("description", vuln.texts.get("summary", None)),
-                detail=vuln.texts.get("detail", None),
-                recommendation=vuln.texts.get("recommendation", None),
+                description=vuln.description,
             )
             for alias in vuln.aliases:
                 vuln_obj.references.add(

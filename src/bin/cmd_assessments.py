@@ -82,11 +82,7 @@ def export_custom_assessments_command(output_dir: str, project: str, variant: st
             aliases: list[str] = []
             vuln_url = ""
             if vuln_obj:
-                desc = vuln_obj.texts.get("description", "")
-                yocto_desc = vuln_obj.texts.get(
-                    "yocto description", ""
-                )
-                description = desc or yocto_desc or ""
+                description = vuln_obj.description
                 aliases = list(vuln_obj.aliases or [])
                 urls = (
                     list(vuln_obj.urls) if vuln_obj.urls

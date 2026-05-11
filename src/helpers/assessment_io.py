@@ -42,9 +42,7 @@ def _get_vuln_info(vuln_id: str, vuln_cache: dict) -> dict:
     aliases: list[str] = []
     vuln_url = ""
     if vuln_obj:
-        desc = vuln_obj.texts.get("description", "")
-        yocto_desc = vuln_obj.texts.get("yocto description", "")
-        description = desc or yocto_desc or ""
+        description = vuln_obj.description or ""
         aliases = list(vuln_obj.aliases or [])
         urls = (
             list(vuln_obj.urls) if vuln_obj.urls

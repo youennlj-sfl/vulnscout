@@ -32,7 +32,7 @@ def pkg_ABC():
 def vuln_123():
     vuln = Vulnerability("CVE-1234-000", ["scanner"], "https://nvd.nist.gov/vuln/detail/CVE-1234-000", "unknown")
     vuln.add_package("abc@1.2.3")
-    vuln.add_text("A flaw was found in abc's image-compositor.c (...)", "description")
+    vuln.description = "A flaw was found in abc's image-compositor.c (...)"
     vuln.add_alias("CVE-1234-999")
     return vuln
 
@@ -130,7 +130,7 @@ def test_parse_statements(openvex_parser):
     assert len(openvex_parser.vulnerabilitiesCtrl.vulnerabilities) == 1
     vuln = openvex_parser.vulnerabilitiesCtrl.get("CVE-2020-35492")
     assert vuln is not None
-    assert vuln.texts["description"] == "A flaw was found in cairo's image-compositor.c (...)"
+    assert vuln.description == "A flaw was found in cairo's image-compositor.c (...)"
     assert len(vuln.aliases) == 1
 
     assert len(openvex_parser.assessmentsCtrl.assessments) == 3
@@ -341,28 +341,9 @@ def test_to_dict_stmt_none_is_skipped(openvex_parser, pkg_ABC, vuln_123):
     assert len(output["statements"]) == 0
 
 
-def test_to_dict_vuln_summary_used_as_description(openvex_parser, pkg_ABC):
-    """to_dict() uses 'summary' when no 'description' text is available (line 133)."""
-    vuln = Vulnerability("CVE-9999-SUMM", ["scanner"], "unknown", "unknown")
-    vuln.add_text("This is a summary", "summary")
-    vuln.add_package(pkg_ABC)
-    assess = Assessment.new_dto(vuln.id, [pkg_ABC.string_id])
-    assess.set_status("affected")
-    openvex_parser.vulnerabilitiesCtrl.add(vuln)
-    openvex_parser.assessmentsCtrl.add(assess)
-    output = openvex_parser.to_dict()
-    stmts = [s for s in output["statements"] if s.get("vulnerability", {}).get("name") == "CVE-9999-SUMM"
-             or str(s.get("vulnerability", {})) == str({"name": "CVE-9999-SUMM"})]
-    # Find the right statement
-    vuln_stmts = [s for s in output["statements"]
-                  if s.get("vulnerability", {}).get("description") == "This is a summary"]
-    assert len(vuln_stmts) >= 1
-
-
 def test_to_dict_vuln_non_http_datasource_no_id(openvex_parser, pkg_ABC):
     """to_dict() skips '@id' on vuln when datasource does not start with http (line 129 skipped)."""
     vuln = Vulnerability("CVE-9999-NODS", ["scanner"], "NVD", "unknown")
-    vuln.add_text("Some issue", "description")
     vuln.add_package(pkg_ABC)
     assess = Assessment.new_dto(vuln.id, [pkg_ABC.string_id])
     assess.set_status("affected")

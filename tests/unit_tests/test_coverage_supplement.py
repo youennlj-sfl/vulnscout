@@ -98,25 +98,6 @@ class TestFindingStringResolution:
 
 
 # ===========================================================================
-# Vulnerability DB model — yocto_description path (line 93)
-# ===========================================================================
-
-class TestVulnerabilityYoctoDescription:
-    def test_yocto_description_populates_texts(self, app):
-        """Create a Vulnerability with yocto_description; line 93 ('yocto description' key)."""
-        from src.models.vulnerability import Vulnerability
-        v = Vulnerability.create_record(
-            id="CVE-2099-YOCTO",
-            description="Normal description",
-            yocto_description="Yocto-specific details",
-        )
-        # _init_transient is called on creation and should populate both keys
-        assert "description" in v.texts
-        assert "yocto description" in v.texts
-        assert v.texts["yocto description"] == "Yocto-specific details"
-
-
-# ===========================================================================
 # Vulnerability DB model — persist_from_transient update path (lines 568-569)
 # ===========================================================================
 
@@ -135,7 +116,7 @@ class TestVulnerabilityPersistUpdate:
 
         # Now build a transient DTO with updated data
         transient = Vulnerability("CVE-2099-UPDATE", ["scanner"], "https://nvd.nist.gov", "nvd")
-        transient.add_text("Updated description", "description")
+        transient.description = "Updated description"
         transient.severity_without_cvss("high", 7.5)
         cvss = CVSS("3.1", "AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N", "NVD", 7.5, 3.9, 4.0)
         transient.register_cvss(cvss)

@@ -90,6 +90,8 @@ def test_parse_components_json(cdx_parser):
 
 
 def test_parse_vulnerabilities_json(cdx_parser):
+    from unittest.mock import MagicMock
+    cdx_parser.vulnerabilitiesCtrl.record_sbom_observation = MagicMock()
     cdx_parser.load_from_dict(json.loads("""{
         "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
         "bomFormat": "CycloneDX",
@@ -186,14 +188,23 @@ def test_parse_vulnerabilities_json(cdx_parser):
 
     cve = cdx_parser.vulnerabilitiesCtrl.get("CVE-2020-35492")
     assert cve.datasource == "https://nvd.nist.gov/vuln/detail/CVE-2020-35492"
-    assert cve.texts["description"] == "A flaw was found in cairo's image-compositor.c"
-    assert cve.texts["detail"] == "Function image_compositor_create make buffer overflow"
+    assert cve.description == "A flaw was found in cairo's image-compositor.c"
     assert "https://bugzilla.redhat.com/show_bug.cgi?id=1898396" in cve.urls
     assert len(cve.severity_cvss) == 1
     assert cve.severity_cvss[0].base_score == 7.8
     assert cve.severity_cvss[0].vector_string == "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H"
     assert cve.severity_label == "critical"
     assert cve.severity_max_score == 9.5
+    cdx_parser.vulnerabilitiesCtrl.record_sbom_observation.assert_any_call(
+        cve,
+        key="CycloneDX Details",
+        description="Function image_compositor_create make buffer overflow",
+    )
+    cdx_parser.vulnerabilitiesCtrl.record_sbom_observation.assert_any_call(
+        cve,
+        key="CycloneDX Recommendation",
+        description="Update to version >= 1.17.4",
+    )
 
     assess = cdx_parser.assessmentsCtrl.gets_by_vuln("CVE-2020-35492")[0]
     assert assess.is_compatible_status("exploitable")
@@ -311,7 +322,7 @@ def test_vulnerability_without_id(cdx_parser):
             }
         ]
     }"""))
-    
+
     cdx_parser.parse_and_merge()
 
     # Assessment should not be created if vulnerability ID is None
@@ -350,7 +361,7 @@ def test_vulnerability_with_workaround_and_analysis(cdx_parser):
         ]
     }"""))
     cdx_parser.parse_and_merge()
-    
+
     assessments = cdx_parser.assessmentsCtrl.gets_by_vuln("CVE-2020-1234")
     assert len(assessments) == 1
     assert assessments[0].workaround == "Apply the patch manually"

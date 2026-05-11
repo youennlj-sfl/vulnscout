@@ -1,11 +1,16 @@
 # Copyright (C) 2026 Savoir-faire Linux, Inc.
 # SPDX-License-Identifier: GPL-3.0-only
 
+import logging
+
 from ..models.package import Package
 from ..models.vulnerability import Vulnerability
 from ..models.assessment import Assessment
 from ..models.cvss import CVSS
 from typing import Optional
+
+
+_logger = logging.getLogger(__name__)
 
 
 class GrypeVulns:
@@ -134,7 +139,9 @@ class GrypeVulns:
 
         description = vulnerability.get("description")
         if isinstance(description, str):
-            vuln_data.add_text(description, "description")
+            vuln_data.description = description
+        else:
+            _logger.warning("Description (%s) is not a string: %s", description, type(description))
 
         for cvss_score in vulnerability.get("cvss", []):
             cvss_item = CVSS(

@@ -287,9 +287,9 @@ def test_extract_vulnerabilities(spdx3_parser):
     assert "https://cveawg.mitre.org/api/cve/CVE-2023-1234" == vuln.datasource
     assert vuln.namespace == "unknown"
     assert "https://www.cve.org/CVERecord?id=CVE-2023-1234" in vuln.urls
-    assert "Inappropriate implementation in Intents in Google Chrome..." in vuln.texts.values()
+    assert "Inappropriate implementation in Intents in Google Chrome..." in vuln.description
     # Description must be under "description" key to be persisted to the DB
-    assert vuln.texts.get("description") == "Inappropriate implementation in Intents in Google Chrome..."
+    assert vuln.description == "Inappropriate implementation in Intents in Google Chrome..."
 
 
 def test_package_vulnerability_relationships(spdx3_parser):
@@ -526,10 +526,10 @@ def test_package_vulnerability_cvss(spdx3_parser):
 
     vuln = spdx3_parser.vulnerabilitiesCtrl.get("CVE-2019-1010022")
     assert vuln.id == "CVE-2019-1010022"
-    
+
     assert len(vuln.severity_cvss) == 2
     cvss_nist, cvss_other = vuln.severity_cvss
-    
+
     assert cvss_nist.base_score == 6.3
     assert cvss_nist.vector_string == "CVSS:3.0/AV:L/AC:H/PR:L/UI:N/S:U/C:H/I:H/A:N"
     assert cvss_nist.author == "nvd@nist.gov"
@@ -655,7 +655,7 @@ def test_package_vulnerability_cvss_malformed(spdx3_parser):
 
     vuln = spdx3_parser.vulnerabilitiesCtrl.get("CVE-2019-1010022")
     assert vuln.id == "CVE-2019-1010022"
-    
+
     assert len(vuln.severity_cvss) == 0
 
 
@@ -840,7 +840,7 @@ def test_could_parse_spdx(spdx3_parser):
         ]
     }
     assert spdx3_parser.could_parse_spdx(spdx_v3) is True
-    
+
     # Valid SPDX 3.x with "type" instead of "@type"
     spdx_v3_alt = {
         "@graph": [
@@ -851,7 +851,7 @@ def test_could_parse_spdx(spdx3_parser):
         ]
     }
     assert spdx3_parser.could_parse_spdx(spdx_v3_alt) is True
-    
+
     # Invalid - SPDX 2.x
     spdx_v2 = {
         "@graph": [
@@ -862,7 +862,7 @@ def test_could_parse_spdx(spdx3_parser):
         ]
     }
     assert spdx3_parser.could_parse_spdx(spdx_v2) is False
-    
+
     # Invalid - no specVersion
     spdx_no_version = {
         "@graph": [
@@ -872,7 +872,7 @@ def test_could_parse_spdx(spdx3_parser):
         ]
     }
     assert spdx3_parser.could_parse_spdx(spdx_no_version) is False
-    
+
     # Invalid - empty
     assert spdx3_parser.could_parse_spdx({}) is False
 
@@ -882,11 +882,11 @@ def test_extract_purl_variations(spdx3_parser):
     # Test with 'packageUrl'
     element1 = {"packageUrl": "pkg:generic/test@1.0"}
     assert spdx3_parser.extract_purl(element1) == "pkg:generic/test@1.0"
-    
+
     # Test with 'software_packageUrl'
     element2 = {"software_packageUrl": "pkg:generic/test@2.0"}
     assert spdx3_parser.extract_purl(element2) == "pkg:generic/test@2.0"
-    
+
     # Test with no PURL
     element3 = {"name": "test"}
     assert spdx3_parser.extract_purl(element3) is None
@@ -897,11 +897,11 @@ def test_extract_cpes_invalid_structure(spdx3_parser):
     # Non-list externalIdentifier
     element1 = {"externalIdentifier": "invalid_string"}
     assert spdx3_parser.extract_cpes(element1) == []
-    
+
     # List with non-dict items
     element2 = {"externalIdentifier": ["string", 123, None]}
     assert spdx3_parser.extract_cpes(element2) == []
-    
+
     # List with dicts but wrong type
     element3 = {
         "externalIdentifier": [
@@ -909,7 +909,7 @@ def test_extract_cpes_invalid_structure(spdx3_parser):
         ]
     }
     assert spdx3_parser.extract_cpes(element3) == []
-    
+
     # Valid CPE
     element4 = {
         "externalIdentifier": [
@@ -969,9 +969,9 @@ def test_package_with_skip_purposes(spdx3_parser):
             }
         ]
     }
-    
+
     spdx3_parser.parse_from_dict(spdx_data)
-    
+
     # Only the application package should be included
     assert len(spdx3_parser.packagesCtrl) == 1
     assert "app-package@1.0" in spdx3_parser.packagesCtrl
@@ -1012,9 +1012,9 @@ def test_vex_relationship_unknown_package_uri(spdx3_parser):
             }
         ]
     }
-    
+
     spdx3_parser.parse_from_dict(spdx_data)
-    
+
     # Assessment should not be created when package is not found
     assert len(spdx3_parser.assessmentsCtrl) == 0
 
@@ -1047,9 +1047,9 @@ def test_relationship_with_empty_to_list(spdx3_parser):
             }
         ]
     }
-    
+
     spdx3_parser.parse_from_dict(spdx_data)
-    
+
     assert len(spdx3_parser.packagesCtrl) == 1
     assert len(spdx3_parser.vulnerabilitiesCtrl) == 0
 
@@ -1102,9 +1102,9 @@ def test_vex_impact_statement(spdx3_parser):
             }
         ]
     }
-    
+
     spdx3_parser.parse_from_dict(spdx_data)
-    
+
     assessments = spdx3_parser.assessmentsCtrl.gets_by_vuln("CVE-2023-1234")
     assert len(assessments) == 1
     assert assessments[0].impact_statement == "This is a detailed impact statement"
@@ -1143,9 +1143,9 @@ def test_parse_controllers_from_dict(spdx3_parser):
             }
         ]
     }
-    
+
     spdx3_parser.parse_controllers_from_dict(spdx_data)
-    
+
     # Only packages should be parsed, not vulnerabilities
     assert len(spdx3_parser.packagesCtrl) == 1
     assert len(spdx3_parser.vulnerabilitiesCtrl) == 0
@@ -1202,9 +1202,9 @@ def test_external_identifier_with_multiple_locators(spdx3_parser):
             }
         ]
     }
-    
+
     spdx3_parser.parse_from_dict(spdx_data)
-    
+
     vuln = spdx3_parser.vulnerabilitiesCtrl.get("CVE-2023-5678")
     assert vuln.datasource == "https://primary.datasource.com/CVE-2023-5678"
     # Secondary and tertiary URLs should be in the URLs list
@@ -1508,7 +1508,7 @@ def test_spdx3_description_persisted_to_db(spdx3_parser):
     # Verify description is under the 'description' key in the in-memory DTO
     vuln = spdx3_parser.vulnerabilitiesCtrl.get("CVE-2025-SPDX3DESC")
     assert vuln is not None
-    assert vuln.texts.get("description") == "Test description from SPDX3 vulnerability element."
+    assert vuln.description == "Test description from SPDX3 vulnerability element."
 
     # Verify it persists to the DB
     db.session.expire_all()
@@ -1516,4 +1516,4 @@ def test_spdx3_description_persisted_to_db(spdx3_parser):
     assert record is not None
     assert record.description == "Test description from SPDX3 vulnerability element."
     # Verify to_dict returns it under "texts" → "description"
-    assert record.to_dict()["texts"]["description"] == "Test description from SPDX3 vulnerability element."
+    assert record.to_dict()["description"] == "Test description from SPDX3 vulnerability element."

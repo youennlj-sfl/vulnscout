@@ -116,8 +116,7 @@ def test_export_vulnerabilities_json(cdx_exporter):
     vuln_1 = Vulnerability("CVE-2020-35492", ["grype"], "https://nvd.nist.gov/vuln/detail/CVE-2020-35492", "NVD")
     vuln_1.add_package(pkg_1)
     vuln_1.add_alias("CVE-2018-99999")
-    vuln_1.add_text("A flaw was found in cairo's image-compositor.c", "description")
-    vuln_1.add_text("Function image_compositor_create make buffer overflow", "detail")
+    vuln_1.description = "A flaw was found in cairo's image-compositor.c"
     vuln_1.add_url("https://bugzilla.redhat.com/show_bug.cgi?id=1898396")
 
     cvss_1 = CVSS("2.0", "AV:L/AC:L/Au:N/C:C/I:C/A:C", "redhat", 5.0, 0.0, 0.0)
@@ -176,7 +175,6 @@ def test_export_vulnerabilities_json(cdx_exporter):
                 }
             ],
             "description": "A flaw was found in cairo's image-compositor.c",
-            "detail": "Function image_compositor_create make buffer overflow",
             "affects": [
                 {
                     "ref": "pkg:generic/cairo@1.16.0"
@@ -272,19 +270,19 @@ def test_export_output_versions(cdx_exporter):
     """Test output_as_json with different versions."""
     pkg = Package("test", "1.0", [], [])
     cdx_exporter.packagesCtrl.add(pkg)
-    
+
     # Test version 4
     output_v4 = json.loads(cdx_exporter.output_as_json(version=4))
     assert output_v4["specVersion"] == "1.4"
-    
+
     # Test version 5
     output_v5 = json.loads(cdx_exporter.output_as_json(version=5))
     assert output_v5["specVersion"] == "1.5"
-    
+
     # Test version 6 (default)
     output_v6 = json.loads(cdx_exporter.output_as_json(version=6))
     assert output_v6["specVersion"] == "1.6"
-    
+
     # Test any other version defaults to 1.6
     output_other = json.loads(cdx_exporter.output_as_json(version=99))
     assert output_other["specVersion"] == "1.6"

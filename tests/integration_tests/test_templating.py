@@ -32,7 +32,7 @@ def pkg_ABC():
 def vuln_123():
     vuln = Vulnerability("CVE-1234-000", ["scanner"], "https://nvd.nist.gov/vuln/detail/CVE-1234-000", "unknown")
     vuln.add_package("abc@1.2.3")
-    vuln.add_text("A flaw was found in abc's image-compositor.c (...)", "description")
+    vuln.description = "A flaw was found in abc's image-compositor.c (...)"
     vuln.add_alias("CVE-1234-999")
     vuln.set_epss(0.5, 0.97)
     vuln.severity_without_cvss("medium", 5.4, True)

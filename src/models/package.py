@@ -15,7 +15,7 @@ from ..extensions import db, Base
 
 
 if typing.TYPE_CHECKING:
-    from ..models import SBOMPackage, Finding
+    from ..models import SBOMObservation, SBOMPackage, Finding
 
 
 class Package(Base):
@@ -46,6 +46,10 @@ class Package(Base):
         cascade="all, delete-orphan",
     )
     findings: Mapped[list["Finding"]] = relationship(
+        back_populates="package",
+        cascade="all, delete-orphan",
+    )
+    sbom_observations: Mapped[list["SBOMObservation"]] = relationship(
         back_populates="package",
         cascade="all, delete-orphan",
     )

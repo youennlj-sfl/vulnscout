@@ -25,7 +25,7 @@ def time_estimates_parser():
 def vuln_123():
     vuln = Vulnerability("CVE-1234-000", ["scanner"], "https://nvd.nist.gov/vuln/detail/CVE-1234-000", "unknown")
     vuln.add_package("abc@1.2.3")
-    vuln.add_text("A flaw was found in abc's image-compositor.c (...)", "description")
+    vuln.description = "A flaw was found in abc's image-compositor.c (...)"
     vuln.add_alias("CVE-1234-999")
     vuln.set_effort('PT4H', 'P1DT2H', 'P2.5D')
     return vuln

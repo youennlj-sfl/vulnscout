@@ -32,8 +32,30 @@ def upgrade():
     sa.Index('vuln_document_index', 'vulnerability_id', 'sbom_document_id')
     )
 
-    # Here would be the place where we migrate old "yocto_description" columns to the new table.
-    # However, it would be quite a pain since we don't know from which SBOM it originally was.
+    # Thanks to https://stackoverflow.com/a/61000724
+    sql_random_uuid = """
+lower(hex( randomblob(4)) || '-' || hex( randomblob(2))
+|| '-' || '4' || substr( hex( randomblob(2)), 2) || '-'
+|| substr('AB89', 1 + (abs(random()) % 4) , 1)  ||
+substr(hex(randomblob(2)), 2) || '-' || hex(randomblob(6)))
+"""
+
+    op.execute(f"""
+INSERT INTO sbom_observation (id, key, vulnerability_id, description, sbom_document_id)
+SELECT DISTINCT
+    {sql_random_uuid} AS id,
+    "Yocto Description" as key,
+    vulnerabilities.id AS vulnerability_id,
+    vulnerabilities.yocto_description as description,
+    sbom_documents.id AS sbom_document_id
+FROM vulnerabilities
+INNER JOIN findings ON vulnerabilities.id = findings.vulnerability_id
+INNER JOIN observations ON observations.finding_id = findings.id
+INNER JOIN scans ON observations.scan_id = scans.id
+INNER JOIN sbom_documents ON sbom_documents.scan_id = scans.id
+WHERE vulnerabilities.yocto_description IS NOT NULL
+AND sbom_documents.format = 'yocto_cve_check'
+""")
 
     with op.batch_alter_table('vulnerabilities', schema=None) as batch_op:
         batch_op.drop_column('yocto_description')

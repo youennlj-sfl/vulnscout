@@ -10,6 +10,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ---
 
+## [0.14.0] - 2026-05-11
+
+### Added
+- Packages: add supplier field with column filtering, modal display, and SBOM supplier variant support (only parsed in SPDX 2.3 inputs).
+- Scan: add assessment visibility to scan history.
+- Scan: add loading wheel to Scan tab.
+- SBOM table: add filter by SBOM Document.
+- CLI: `--project` and `--variant` support for `--import-custom-assessments` and `--export-custom-assessments`.
+- Validation: add JSON SBOM validation scripts and schemas for CycloneDX, SPDX, and OpenVEX.
+
+### Changed
+- Refactor: split `merger_ci.py` into submodules; extract shared OpenVEX import/export helpers.
+- Refactor: extract observations and package resolution logic into separate functions.
+- Refactor: remove `scan_diff_cache` layer and duplicate resolution in scan code.
+- Refactor: `--variant` handling moved to entrypoint.
+- Dockerfile: speed up frontend rebuild.
+- Chore: remove utf-8 headers, copyright set to 2026.
+
+### Fixed
+- Scan: exclude future-scan assessments from Scan Result.
+- Assessments: correctly parse assessments from new SBOM.
+- Project scope correctly applied in the app.
+- OpenVEX: fix validation issues; return supplier-qualified `@id` in product output.
+- SPDX3: fix export validation issues.
+- Normalize SPDX dict for compatibility with three-part versions.
+- CLI: resolve flake8 errors, import duplication, and variable init in `cmd_` files.
+
+### Removed
+- Remove patch-finder related code.
+
+### Documentation
+- Updated `--import/export-custom-assessments` docs to add `--variant` option.
+
+---
+
 ## [0.13.0] - 2026-04-28
 
 ### Added

@@ -75,7 +75,7 @@ def _should_refetch(fetched_at: Optional[datetime.datetime], delay: Optional[dat
         return True
     if delay is _NEVER:
         return False
-    assert delay
+    assert delay is not None
     return (datetime.datetime.utcnow() - fetched_at) >= delay
 
 
@@ -231,7 +231,6 @@ class VulnerabilitiesController:
         and have not gained new packages in this call — avoiding redundant
         get_by_id SELECTs and update_record commits on every re-encounter.
         """
-        assert vulnerability is not None
         _caches = dict(
             pkg_id_cache=self.packagesCtrl._db_id_cache,
             finding_cache=self.packagesCtrl._finding_cache,

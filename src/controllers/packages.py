@@ -89,7 +89,6 @@ class PackagesController:
         """Persist a Package to the DB and keep it in the session cache."""
         if package is None:
             return
-        assert package.name and package.version
         string_id = package.string_id  # "name@version"
         already_persisted = string_id in self._db_id_cache
         if string_id in self._cache:

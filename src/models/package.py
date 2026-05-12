@@ -266,8 +266,8 @@ class Package(Base):
 
     @staticmethod
     def find_or_create(
-        name: str,
-        version: str,
+        name: str | None,
+        version: str | None,
         cpe: Optional[list] = None,
         purl: Optional[list] = None,
         licences: str = "",
@@ -284,7 +284,7 @@ class Package(Base):
 
         if existing is None:
             existing = Package(
-                name=name, version=version,
+                name=name or "", version=version or "",
                 cpe=cpe or [], purl=purl or [],
                 licences=licences, supplier=supplier or "",
             )

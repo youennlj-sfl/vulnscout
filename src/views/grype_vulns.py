@@ -3,6 +3,7 @@
 
 import logging
 
+from ..controllers import PackagesController, VulnerabilitiesController, AssessmentsController
 from ..models.package import Package
 from ..models.vulnerability import Vulnerability
 from ..models.assessment import Assessment
@@ -20,9 +21,9 @@ class GrypeVulns:
     """
 
     def __init__(self, controllers):
-        self.packagesCtrl = controllers["packages"]
-        self.vulnerabilitiesCtrl = controllers["vulnerabilities"]
-        self.assessmentsCtrl = controllers["assessments"]
+        self.packagesCtrl: PackagesController = controllers["packages"]
+        self.vulnerabilitiesCtrl: VulnerabilitiesController = controllers["vulnerabilities"]
+        self.assessmentsCtrl: AssessmentsController = controllers["assessments"]
 
     @staticmethod
     def _normalize_artifact_name(name: str, purl: Optional[str] = None) -> str:
@@ -140,7 +141,7 @@ class GrypeVulns:
         description = vulnerability.get("description")
         if isinstance(description, str):
             vuln_data.description = description
-        else:
+        elif description is not None:
             _logger.warning("Description (%s) is not a string: %s", description, type(description))
 
         for cvss_score in vulnerability.get("cvss", []):
@@ -193,28 +194,55 @@ class GrypeVulns:
             if "vulnerability" not in match:
                 continue
 
-            vuln_data = self.parse_vulnerability_section(match["vulnerability"])
+            vulnerability_data = match["vulnerability"]
+            vulnerability = self.parse_vulnerability_section(vulnerability_data)
 
-            if vuln_data.id == "" or len(packages) < 1:
+            if vulnerability.id == "" or len(packages) < 1:
                 continue
 
-            for package in packages:
-                vuln_data.add_package(package)
+            for package_id in packages:
+                vulnerability.add_package(package_id)
 
-            vuln_data = self.vulnerabilitiesCtrl.add(vuln_data)
+            vulnerability = self.vulnerabilitiesCtrl.add(vulnerability)
+
+            vuln_fix_data = vulnerability_data.get("fix", {})
+            fix_state: str | None = None
+            match vuln_fix_data.get("state", ""):
+                case "not-fixed" | "":
+                    pass
+                case "wont-fix":
+                    fix_state = "Grype reported this issue as 'won't fix'"
+                case "fixed":
+                    if "versions" in vuln_fix_data:
+                        fix_state = (
+                            "Grype reported this issue as 'fixed' in the following versions: "
+                            + ", ".join(vuln_fix_data["versions"])
+                        )
+                case unknown_state:
+                    _logger.warning("Unknown fix state %s", unknown_state)
+            if fix_state:
+                for package_id in packages:
+                    package = self.packagesCtrl.get(package_id)
+                    assert package
+                    self.vulnerabilitiesCtrl.record_sbom_observation(
+                        vuln=vulnerability,
+                        package=package,
+                        key="Grype fix state",
+                        description=fix_state
+                    )
 
             pkg0 = packages[0]
             if pkg0 in self.assessmentsCtrl._db_queried_pkgs:
                 # Package was pre-warmed: all existing assessments are already
                 # in the in-memory index. Consult it directly — no DB query.
-                existing = self.assessmentsCtrl._by_vuln_pkg.get((vuln_data.id, pkg0), [])
+                existing = self.assessmentsCtrl._by_vuln_pkg.get((vulnerability.id, pkg0), [])
                 if not existing:
-                    assessment = Assessment.new_dto(vuln_data.id, packages)
+                    assessment = Assessment.new_dto(vulnerability.id, packages)
                     self.assessmentsCtrl.add(assessment)
             else:
                 # Fallback for packages that came only from matchDetails
                 # (no artifact section), which bypass the pre-warm above.
-                existing_assessments = self.assessmentsCtrl.gets_by_vuln_pkg(vuln_data.id, pkg0)
+                existing_assessments = self.assessmentsCtrl.gets_by_vuln_pkg(vulnerability.id, pkg0)
                 if len(existing_assessments) < 1:
-                    assessment = Assessment.new_dto(vuln_data.id, packages)
+                    assessment = Assessment.new_dto(vulnerability.id, packages)
                     self.assessmentsCtrl.add(assessment)

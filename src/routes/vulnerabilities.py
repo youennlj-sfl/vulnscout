@@ -513,15 +513,25 @@ def init_app(app):
 
             # Enrich with observation statuses
             variant_sbom_observations = db.session.execute(
-                select(SBOMObservation.vulnerability_id, SBOMObservation.key, SBOMObservation.description)
+                select(
+                    SBOMObservation.vulnerability_id,
+                    SBOMObservation.key,
+                    SBOMObservation.description,
+                    func.aggregate_strings(Package.name, ";"),
+                )
                 .join(SBOMDocument, SBOMObservation.sbom_document_id == SBOMDocument.id)
+                .join(Package, SBOMObservation.package_id == Package.id, isouter=True)
                 .where(SBOMObservation.vulnerability_id.in_(vuln_ids))
                 .where(SBOMDocument.scan_id.in_(active_scan_ids))
+                .group_by(
+                    SBOMObservation.vulnerability_id,
+                    SBOMObservation.key,
+                    SBOMObservation.description,
+                )
                 .distinct()
             ).all()
-            for vuln_id, obs_key, obs_desc in variant_sbom_observations:
+            for vuln_id, obs_key, obs_desc, obs_packages in variant_sbom_observations:
                 vuln = vulns[vuln_id]
-                # TODO return package for sbom observation
                 vuln["texts"].append({
                     "title": obs_key,
                     "content": obs_desc,

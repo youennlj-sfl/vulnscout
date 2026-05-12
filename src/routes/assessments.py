@@ -1,11 +1,10 @@
 # Copyright (C) 2026 Savoir-faire Linux, Inc.
 # SPDX-License-Identifier: GPL-3.0-only
 
-from flask import request
 from datetime import datetime
-from ..models.assessment import Assessment as DBAssessment, STATUS_TO_SIMPLIFIED
-from ..models.package import Package
-from ..models.finding import Finding
+
+from ..models import Assessment as DBAssessment, Package, Finding, SBOMObservation
+from ..models.assessment import STATUS_TO_SIMPLIFIED
 from ..views.openvex import OpenVex
 from ..controllers.packages import PackagesController
 from ..controllers.vulnerabilities import VulnerabilitiesController
@@ -21,6 +20,9 @@ from ..helpers.assessment_io import (
     build_variant_by_name_map,
     import_archive_bytes,
 )
+
+from flask import request
+from sqlalchemy import select
 
 OPENVEX_FILE = "/scan/outputs/openvex.json"
 
@@ -109,28 +111,53 @@ def init_app(app):
                 vid = _uuid.UUID(variant_id)
             except ValueError:
                 return {"error": "Invalid variant_id"}, 400
-            assessments = [a.to_dict() for a in DBAssessment.get_handmade([vid])]
+            assessments = DBAssessment.get_handmade([vid])
         elif project_id:
             try:
                 pid = _uuid.UUID(project_id)
             except ValueError:
                 return {"error": "Invalid project_id"}, 400
             variant_ids = [variant.id for variant in DBVariant.get_by_project(pid)]
-            assessments = [a.to_dict() for a in DBAssessment.get_handmade(variant_ids)]
+            assessments = DBAssessment.get_handmade(variant_ids)
         else:
-            assessments = [a.to_dict() for a in DBAssessment.get_handmade()]
+            assessments = DBAssessment.get_handmade()
 
         # Enrich with vulnerability texts for front-end tooltips (single DB pass)
-        vuln_ids = {a["vuln_id"] for a in assessments if a.get("vuln_id")}
-        vuln_texts: dict[str, dict] = {}
-        for vid_str in vuln_ids:
-            vuln = DBVuln.get_by_id(vid_str)
-            if vuln is not None:
-                vuln_texts[vid_str] = {"description": vuln.description}  # TODO use SBOMObservation
-        for a in assessments:
-            a["vuln_texts"] = vuln_texts.get(a.get("vuln_id", ""), {})
+        vuln_ids = {a.vuln_id for a in assessments if a.vuln_id}
+        vuln_texts: dict[str, list[dict]] = {vuln_id: [] for vuln_id in vuln_ids}
+        vuln_desc_query = (
+            select(DBVuln.id, DBVuln.description)
+            .where(DBVuln.id.in_(vuln_ids) & DBVuln.description.is_not(None))
+        )
+        for vuln_id, vuln_desc in db.session.execute(vuln_desc_query).all():
+            vuln_texts[vuln_id].append({
+                "title": "description",
+                "content": vuln_desc,
+            })
 
-        return assessments
+        # Enrich with observation statuses
+        sbom_observation_query = (
+            select(
+                SBOMObservation.vulnerability_id,
+                SBOMObservation.key,
+                SBOMObservation.description,
+            )
+            .where(SBOMObservation.vulnerability_id.in_(vuln_ids))
+            .distinct()
+        )
+        for vuln_id, obs_key, obs_desc in db.session.execute(sbom_observation_query).all():
+            vuln_texts[vuln_id].append({
+                "title": obs_key,
+                "content": obs_desc,
+            })
+
+        assessments_serialized = []
+        for a in assessments:
+            a_ser = a.to_dict()
+            a_ser["vuln_texts"] = vuln_texts[a.vuln_id]
+            assessments_serialized.append(a_ser)
+
+        return assessments_serialized
 
     @app.route('/api/assessments/review/export')
     def export_review_openvex():

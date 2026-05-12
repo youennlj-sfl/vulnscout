@@ -169,10 +169,7 @@ function Review({ variantId, projectId, onAssessmentChanged }: Readonly<Props>) 
                 const descMap: Record<string, { title: string; content: string }[]> = {};
                 for (const a of data) {
                     if (a.vuln_id && !descMap[a.vuln_id] && a.vuln_texts) {
-                        const entries = Object.entries(a.vuln_texts);
-                        descMap[a.vuln_id] = entries.length > 0
-                            ? entries.map(([title, content]) => ({ title, content }))
-                            : [{ title: "description", content: "No description available" }];
+                        descMap[a.vuln_id] = a.vuln_texts || [{ title: "description", content: "No description available" }];
                     }
                 }
                 setVulnDescriptions(descMap);

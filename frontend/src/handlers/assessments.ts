@@ -26,7 +26,10 @@ type Assessment = {
     timestamp: string;
     last_update?: string;
     responses: string[];
-    vuln_texts?: Record<string, string>;
+    vuln_texts?: {
+        title: string;
+        content: string;
+    }[];
 };
 
 export type { Assessment };
@@ -68,7 +71,7 @@ const asAssessment = (data: any): Assessment | [] => {
     if (typeof data?.workaround === "string") item.workaround = data.workaround;
     if (typeof data?.workaround_timestamp === "string") item.workaround_timestamp = data.workaround_timestamp;
     if (typeof data?.last_update === "string") item.last_update = data.last_update;
-    if (typeof data?.vuln_texts === "object" && data.vuln_texts !== null) item.vuln_texts = data.vuln_texts;
+    if (Array.isArray(data?.vuln_texts)) item.vuln_texts = data.vuln_texts;
     return item
 }
 

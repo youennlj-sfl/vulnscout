@@ -6,8 +6,9 @@ import typing
 
 from ..extensions import db, Base
 
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if typing.TYPE_CHECKING:
     from .variant import Variant
@@ -17,13 +18,12 @@ class Project(Base):
     """Represents a project that groups one or more variants."""
 
     __tablename__ = "projects"
-    __table_args__ = (db.UniqueConstraint("name", name="uq_projects_name"),)
+    __table_args__ = (UniqueConstraint("name", name="uq_projects_name"),)
 
-    id: Mapped[uuid.UUID] = db.Column(db.Uuid, primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = db.Column(db.String, nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str]
 
-    variants: Mapped[list["Variant"]] = db.relationship(  # type: ignore
-        "Variant",
+    variants: Mapped[list["Variant"]] = relationship(
         back_populates="project",
         cascade="all, delete-orphan"
     )

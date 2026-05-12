@@ -4,9 +4,18 @@
 import uuid
 import re
 import hashlib
+import typing
 import semver
 from typing import Optional
+
+from sqlalchemy import JSON
+from sqlalchemy.orm import Mapped, relationship, mapped_column
+
 from ..extensions import db, Base
+
+
+if typing.TYPE_CHECKING:
+    from ..models import SBOMPackage, Finding
 
 
 class Package(Base):
@@ -19,21 +28,27 @@ class Package(Base):
 
     __tablename__ = "packages"
 
-    id = db.Column(db.Uuid, primary_key=True, default=uuid.uuid4)
-    name = db.Column(db.String, nullable=True)
-    version = db.Column(db.String, nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str | None]  # Nullable, really? TODO investigate
+    version: Mapped[str | None]
     # TODO: Spin-off CPE and PURL into separate tables
-    cpe = db.Column(db.JSON, nullable=True)
-    purl = db.Column(db.JSON, nullable=True)
-    licences = db.Column(db.String, nullable=True)
-    supplier = db.Column(db.String, nullable=False, default="")
+    cpe: Mapped[list | None] = mapped_column(JSON)
+    purl: Mapped[list | None] = mapped_column(JSON)
+    licences: Mapped[str | None]
+    supplier: Mapped[str] = mapped_column(default="")
 
     __table_args__ = (
         db.Index('ix_packages_name_version_supplier', 'name', 'version', 'supplier'),
     )
 
-    sbom_packages = db.relationship("SBOMPackage", back_populates="package", cascade="all, delete-orphan")
-    findings = db.relationship("Finding", back_populates="package", cascade="all, delete-orphan")
+    sbom_packages: Mapped[list["SBOMPackage"]] = relationship(
+        back_populates="package",
+        cascade="all, delete-orphan",
+    )
+    findings: Mapped[list["Finding"]] = relationship(
+        back_populates="package",
+        cascade="all, delete-orphan",
+    )
 
     # ------------------------------------------------------------------
     # Constructor with support for legacy arg calls
@@ -139,6 +154,7 @@ class Package(Base):
     # ------------------------------------------------------------------
 
     def _parse_version(self):
+        assert self.version is not None
         return semver.Version.parse(self.version, optional_minor_and_patch=True)
 
     def __eq__(self, other) -> bool:
@@ -250,8 +266,8 @@ class Package(Base):
 
     @staticmethod
     def find_or_create(
-        name: str,
-        version: str,
+        name: str | None,
+        version: str | None,
         cpe: Optional[list] = None,
         purl: Optional[list] = None,
         licences: str = "",
@@ -268,7 +284,7 @@ class Package(Base):
 
         if existing is None:
             existing = Package(
-                name=name, version=version,
+                name=name or "", version=version or "",
                 cpe=cpe or [], purl=purl or [],
                 licences=licences, supplier=supplier or "",
             )

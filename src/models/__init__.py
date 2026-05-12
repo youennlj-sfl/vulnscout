@@ -1,16 +1,18 @@
 # Copyright (C) 2026 Savoir-faire Linux, Inc.
 # SPDX-License-Identifier: GPL-3.0-only
 
-from ..extensions import db  # noqa: F401
-from .project import Project  # noqa: F401
-from .variant import Variant  # noqa: F401
-from .scan import Scan  # noqa: F401
-from .sbom_document import SBOMDocument  # noqa: F401
-from .package import Package  # noqa: F401
-from .sbom_package import SBOMPackage  # noqa: F401
-from .vulnerability import Vulnerability  # noqa: F401
-from .finding import Finding  # noqa: F401
-from .observation import Observation  # noqa: F401
-from .assessment import Assessment  # noqa: F401
-from .time_estimate import TimeEstimate  # noqa: F401
-from .metrics import Metrics  # noqa: F401
+from ..extensions import db
+from .project import Project
+from .variant import Variant
+from .scan import Scan
+from .sbom_document import SBOMDocument
+from .package import Package
+from .sbom_package import SBOMPackage
+from .vulnerability import Vulnerability
+from .finding import Finding
+from .observation import Observation
+from .assessment import Assessment
+from .time_estimate import TimeEstimate
+from .metrics import Metrics
+from .cvss import CVSS
+from .iso8601_duration import Iso8601Duration

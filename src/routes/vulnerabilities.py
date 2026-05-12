@@ -4,20 +4,22 @@
 import uuid
 
 from flask import request
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload, aliased
-from ..models.vulnerability import Vulnerability
-from ..models.finding import Finding
-from ..models.observation import Observation
-from ..models.package import Package
-from ..models.scan import Scan
+from ..models import (
+    Vulnerability,
+    Finding,
+    Observation,
+    Package,
+    Scan,
+    Variant,
+    Metrics,
+    CVSS,
+    SBOMDocument,
+    SBOMPackage,
+    Iso8601Duration
+)
 from ..helpers.datetime_utils import ensure_utc_iso
-from ..models.variant import Variant
-from ..models.metrics import Metrics
-from ..models.cvss import CVSS
-from ..models.iso8601_duration import Iso8601Duration
-from ..models.sbom_document import SBOMDocument
-from ..models.sbom_package import SBOMPackage
 from ..extensions import db
 from ..helpers.verbose import verbose
 from ..helpers.active_scans import (
@@ -130,15 +132,18 @@ def _populate_found_by(
     found_by_map: dict[str, set[str]] = {}
     for vuln_id, entry in vuln_formats.items():
         doc_formats = entry["doc_formats"]
+        scan_source = entry["scan_source"]
         if doc_formats:
             # Prefer non-dedicated (spdx, cdx, openvex) over dedicated (grype, yocto)
             non_dedicated = doc_formats - _DEDICATED_SCANNER_FORMATS
             chosen = non_dedicated if non_dedicated else doc_formats
             for fmt in chosen:
+                assert isinstance(fmt, str)
                 mapped = _FORMAT_TO_FOUND_BY.get(fmt, fmt)
                 found_by_map.setdefault(vuln_id, set()).add(mapped)
-        elif entry["scan_source"] is not None:
-            mapped = _TOOL_SOURCE_TO_FOUND_BY.get(entry["scan_source"], entry["scan_source"])
+        elif scan_source is not None:
+            assert isinstance(scan_source, str)
+            mapped = _TOOL_SOURCE_TO_FOUND_BY.get(scan_source, scan_source)
             found_by_map.setdefault(vuln_id, set()).add(mapped)
 
     for record in records:
@@ -205,7 +210,7 @@ def init_app(app):
                     compare_ids = _vuln_ids_for_scans(compare_latest_ids)
                     intersection_ids = list(base_ids & compare_ids)
                     records = list(db.session.execute(
-                        db.select(Vulnerability)
+                        select(Vulnerability)
                         .options(*opts)
                         .where(Vulnerability.id.in_(intersection_ids))
                         .order_by(Vulnerability.id)
@@ -216,7 +221,7 @@ def init_app(app):
                 else:
                     compare_pkg_ids = active_package_ids_for_scans(compare_latest_ids)
                     query = (
-                        db.select(Vulnerability)
+                        select(Vulnerability)
                         .options(*opts)
                         .join(Finding, Vulnerability.id == Finding.vulnerability_id)
                         .join(Observation, Finding.id == Observation.finding_id)
@@ -252,7 +257,7 @@ def init_app(app):
                 # vulns from appearing in the Vulnerability tab.
                 _pkg_ids = active_package_ids_for_scans(latest_ids)
                 query = (
-                    db.select(Vulnerability)
+                    select(Vulnerability)
                     .options(
                         selectinload(Vulnerability.findings).selectinload(Finding.package),
                         selectinload(Vulnerability.findings).selectinload(Finding.time_estimate),
@@ -333,7 +338,7 @@ def init_app(app):
                 vuln_ids_subq = vuln_ids_base.distinct().scalar_subquery()
 
                 records = list(db.session.execute(
-                    db.select(Vulnerability)
+                    select(Vulnerability)
                     .where(Vulnerability.id.in_(vuln_ids_subq))
                     .order_by(Vulnerability.id)
                 ).scalars().all())
@@ -406,10 +411,10 @@ def init_app(app):
             _scope_project = None
         _populate_found_by(records, _scope_variant, _scope_project,
                            active_scan_ids=current_scan_ids or None)
-        vulns = [r.to_dict() for r in records]
+        vulns = {r.id: r.to_dict() for r in records}
+        vuln_ids = vulns.keys()
 
-        vuln_ids = [v["id"] for v in vulns]
-        if vuln_ids:
+        if vulns:
             # packages_current: packages from the specific scan(s), expanded to include all
             # same-name+version supplier variants present in the active SBOM scans.
             # This ensures that Grype-linked packages (no supplier) also surface SBOM packages.
@@ -434,10 +439,10 @@ def init_app(app):
                 for vuln_id, pkg_name, pkg_version, pkg_sup in pkg_rows:
                     sid = f"{pkg_name}@{pkg_version}::{pkg_sup}" if pkg_sup else f"{pkg_name}@{pkg_version}"
                     pkgs_current_by_vuln.setdefault(str(vuln_id), []).append(sid)
-                for v in vulns:
+                for v in vulns.values():
                     v["packages_current"] = sorted(pkgs_current_by_vuln.get(v["id"], []))
             else:
-                for v in vulns:
+                for v in vulns.values():
                     v["packages_current"] = list(v["packages"])
 
             # Enrich each vuln dict with sorted variant names, restricted to
@@ -478,8 +483,8 @@ def init_app(app):
             variant_names_by_vuln: dict = {}
             for vuln_id, variant_name in rows:
                 variant_names_by_vuln.setdefault(str(vuln_id), []).append(variant_name)
-            for v in vulns:
-                v["variants"] = sorted(variant_names_by_vuln.get(v["id"], []))
+            for vuln_id, vuln in vulns.items():
+                vuln["variants"] = sorted(variant_names_by_vuln.get(vuln_id, []))
 
             # Enrich with the date of the earliest scan where each vuln was first observed
             first_scan_rows = db.session.execute(
@@ -492,12 +497,16 @@ def init_app(app):
             first_scan_by_vuln: dict = {}
             for vuln_id, min_ts in first_scan_rows:
                 first_scan_by_vuln[str(vuln_id)] = ensure_utc_iso(min_ts)
-            for v in vulns:
-                v["first_scan_date"] = first_scan_by_vuln.get(v["id"])
+            for vuln_id, vuln in vulns.items():
+                vuln["first_scan_date"] = first_scan_by_vuln.get(vuln_id)
 
-        if request.args.get('format', 'list') == "dict":
-            return {v["id"]: v for v in vulns}
-        return vulns
+        match request.args.get('format', 'list'):
+            case "list":
+                return list(vulns.values())
+            case "dict":
+                return vulns
+            case _ as fmt:
+                raise ValueError("Unknown format", fmt)
 
     @app.route('/api/vulnerabilities/<id>', methods=['GET', 'PATCH'])
     def update_vuln(id):

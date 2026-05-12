@@ -6,14 +6,12 @@ import typing
 
 from ..extensions import db, Base
 
+from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if typing.TYPE_CHECKING:
-    from .project import Project
-    from .scan import Scan
-    from .assessment import Assessment
-    from .time_estimate import TimeEstimate
+    from ..models import Project, Scan, Assessment, TimeEstimate
 
 
 class Variant(Base):
@@ -21,25 +19,25 @@ class Variant(Base):
 
     __tablename__ = "variants"
     __table_args__ = (
-        db.UniqueConstraint("name", "project_id", name="uq_variants_name_project"),
+        UniqueConstraint("name", "project_id", name="uq_variants_name_project"),
     )
 
-    id: Mapped[uuid.UUID] = db.Column(db.Uuid, primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = db.Column(db.String, nullable=False)
-    project_id: Mapped[uuid.UUID] = db.Column(db.Uuid, db.ForeignKey("projects.id"), nullable=False)
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str]
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
 
-    project: Mapped["Project"] = db.relationship(  # type: ignore
+    project: Mapped["Project"] = relationship(
         back_populates="variants"
     )
-    scans: Mapped[list["Scan"]] = db.relationship(  # type: ignore
+    scans: Mapped[list["Scan"]] = relationship(
         back_populates="variant",
         cascade="all, delete-orphan"
     )
-    assessments: Mapped[list["Assessment"]] = db.relationship(  # type: ignore
+    assessments: Mapped[list["Assessment"]] = relationship(
         back_populates="variant",
         cascade="all, delete-orphan"
     )
-    time_estimates: Mapped[list["TimeEstimate"]] = db.relationship(  # type: ignore
+    time_estimates: Mapped[list["TimeEstimate"]] = relationship(
         back_populates="variant",
         cascade="all, delete-orphan"
     )

@@ -44,7 +44,7 @@ def export_command(export_format: str, output_dir: str) -> None:
     try:
         if fmt == "spdx2":
             spdx = SPDX(ctrls)
-            content = spdx.output_as_json(author)
+            content = spdx.output_as_json(author=author)
             out_path = os.path.join(output_dir, "sbom_spdx_v2_3.spdx.json")
             with open(out_path, "w") as fh:
                 fh.write(content)

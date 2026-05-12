@@ -4,6 +4,7 @@
 from ..models.package import Package
 from ..models.vulnerability import Vulnerability
 from ..models.assessment import Assessment
+from ..controllers import PackagesController, VulnerabilitiesController, AssessmentsController
 from ..helpers.verbose import verbose
 from uuid_extensions import uuid7
 from datetime import datetime, timezone
@@ -18,9 +19,9 @@ class OpenVex:
     """
 
     def __init__(self, controllers):
-        self.packagesCtrl = controllers["packages"]
-        self.vulnerabilitiesCtrl = controllers["vulnerabilities"]
-        self.assessmentsCtrl = controllers["assessments"]
+        self.packagesCtrl: PackagesController = controllers["packages"]
+        self.vulnerabilitiesCtrl: VulnerabilitiesController = controllers["vulnerabilities"]
+        self.assessmentsCtrl: AssessmentsController = controllers["assessments"]
 
     def parse_package_section(self, product: dict) -> Optional[Package]:
         pkg = None
@@ -140,10 +141,11 @@ class OpenVex:
                 pkg = self.packagesCtrl.get(pkg_id)
 
                 if pkg is not None:
-                    if len(pkg.cpe) < 1:
+                    if not pkg.cpe:
                         pkg.generate_generic_cpe()
-                    if len(pkg.purl) < 1:
+                    if not pkg.purl:
                         pkg.generate_generic_purl()
+                    assert pkg.cpe and pkg.purl
                     product = {
                         "@id": pkg.purl[0],
                         "identifiers": {

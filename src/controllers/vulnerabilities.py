@@ -5,7 +5,9 @@ import datetime
 import time
 import os
 import json
+import typing
 import urllib.request
+import urllib.error
 from typing import Optional
 
 from ..models.vulnerability import Vulnerability
@@ -73,6 +75,7 @@ def _should_refetch(fetched_at: Optional[datetime.datetime], delay: Optional[dat
         return True
     if delay is _NEVER:
         return False
+    assert delay is not None
     return (datetime.datetime.utcnow() - fetched_at) >= delay
 
 
@@ -135,7 +138,7 @@ class VulnerabilitiesController:
 
     def __init__(self, pkgCtrl: PackagesController):
         """Take an instance of PackagesController to resolve package dependencies as parameter."""
-        self.packagesCtrl = pkgCtrl
+        self.packagesCtrl: PackagesController = pkgCtrl
         self.vulnerabilities: dict[str, Vulnerability] = {}
         """A dictionary of vulnerabilities, indexed by their id."""
         self.alias_registered: dict[str, str] = {}
@@ -202,7 +205,7 @@ class VulnerabilitiesController:
             verbose(f"[VulnerabilitiesController._preload_cache] {e}")
     # ------------------------------------------------------------------
 
-    def get(self, vuln_id: str):
+    def get(self, vuln_id: str) -> Vulnerability | None:
         """Return a vulnerability by id (str) or None if not found. Also look for aliases."""
         if vuln_id in self.vulnerabilities:
             return self.vulnerabilities[vuln_id]
@@ -219,7 +222,7 @@ class VulnerabilitiesController:
             verbose(f"[VulnerabilitiesController.get {vuln_id!r}] {e}")
         return None
 
-    def add(self, vulnerability: Vulnerability) -> Optional[Vulnerability]:
+    def add(self, vulnerability: Vulnerability) -> Vulnerability:
         """
         Add a vulnerability to the list, merging it with an existing one if present.
         Return the vulnerability as is if added, or the merged vulnerability if already existing.
@@ -228,8 +231,6 @@ class VulnerabilitiesController:
         and have not gained new packages in this call — avoiding redundant
         get_by_id SELECTs and update_record commits on every re-encounter.
         """
-        if vulnerability is None:
-            return
         _caches = dict(
             pkg_id_cache=self.packagesCtrl._db_id_cache,
             finding_cache=self.packagesCtrl._finding_cache,
@@ -684,7 +685,7 @@ class VulnerabilitiesController:
         """Return the number of vulnerabilities in the list."""
         return len(self.vulnerabilities)
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator[Vulnerability]:
         """Allow iteration over the list of vulnerabilities.
 
         When the in-memory dict is populated (during scan processing) it is

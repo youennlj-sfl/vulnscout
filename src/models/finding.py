@@ -3,16 +3,16 @@
 
 import uuid
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy.orm import Mapped, relationship
+
+from sqlalchemy import ForeignKey, String, UniqueConstraint
+from sqlalchemy.orm import Mapped, relationship, mapped_column
+
 from ..extensions import db, Base
 from ..helpers.verbose import verbose
 from .package import Package
 
 if TYPE_CHECKING:
-    from .time_estimate import TimeEstimate  # noqa: F811
-    from .vulnerability import Vulnerability
-    from .observation import Observation
-    from .assessment import Assessment
+    from ..models import TimeEstimate, Vulnerability, Observation, Assessment
 
 
 class Finding(Base):
@@ -20,22 +20,24 @@ class Finding(Base):
 
     __tablename__ = "findings"
 
-    id = db.Column(db.Uuid, primary_key=True, default=uuid.uuid4)
-    package_id = db.Column(db.Uuid, db.ForeignKey("packages.id"), nullable=False, index=True)
-    vulnerability_id = db.Column(db.String(50), db.ForeignKey("vulnerabilities.id"), nullable=False, index=True)
-
-    __table_args__ = (
-        db.UniqueConstraint("package_id", "vulnerability_id", name="uq_finding_package_vulnerability"),
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    package_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("packages.id"), index=True)
+    vulnerability_id: Mapped[str] = mapped_column(
+        String(50), ForeignKey("vulnerabilities.id"), index=True
     )
 
-    package: Mapped["Package"] = relationship("Package")
-    vulnerability: Mapped["Vulnerability"] = relationship("Vulnerability", back_populates="findings")
+    __table_args__ = (
+        UniqueConstraint("package_id", "vulnerability_id", name="uq_finding_package_vulnerability"),
+    )
+
+    package: Mapped["Package"] = relationship()
+    vulnerability: Mapped["Vulnerability"] = relationship(back_populates="findings")
     observations: Mapped[list["Observation"]] = relationship(
-        "Observation", back_populates="finding", cascade="all, delete-orphan")
+        back_populates="finding", cascade="all, delete-orphan")
     assessments: Mapped[list["Assessment"]] = relationship(
-        "Assessment", back_populates="finding", cascade="all, delete-orphan")
+        back_populates="finding", cascade="all, delete-orphan")
     time_estimate: Mapped[Optional["TimeEstimate"]] = relationship(
-        "TimeEstimate", back_populates="finding", uselist=False, cascade="all, delete-orphan")
+        back_populates="finding", uselist=False, cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return (

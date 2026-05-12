@@ -6,6 +6,7 @@ Targets uncovered branches reported by the CI coverage run:
   cmd_export.py – lines 72-74, 122-125, 145, 157, 160-163, 165-168
 """
 
+import json
 import os
 import pytest
 from unittest.mock import patch
@@ -159,3 +160,23 @@ class TestCmdExportCoverage:
                 "report", "report.adoc", "--output-dir", str(tmp_path)
             ])
         mock_eval.assert_called_once()
+
+
+class TestCmdExportSpdx2:
+    def test_author_present(self, app, tmp_path, monkeypatch):
+        """Exception inside export_command is caught and exits with code 1 (lines 72-74)."""
+        monkeypatch.setenv("AUTHOR_NAME", "TestAuthor")
+
+        runner = app.test_cli_runner()
+        result = runner.invoke(args=[
+            "export", "--format", "spdx2", "--output-dir", str(tmp_path)
+        ])
+
+        assert result.exit_code == 0, result.output
+        exported_file = tmp_path / "sbom_spdx_v2_3.spdx.json"
+        assert exported_file.exists()
+
+        with open(exported_file, "r") as f:
+            data = json.load(f)
+
+        assert "Organization: TestAuthor" in data["creationInfo"]["creators"]

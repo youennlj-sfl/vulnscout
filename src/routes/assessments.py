@@ -3,7 +3,7 @@
 
 from datetime import datetime
 
-from ..models import Assessment as DBAssessment, Package, Finding, SBOMObservation
+from ..models import Assessment as DBAssessment, Package, Finding, SBOMObservation, SBOMDocument, Scan
 from ..models.assessment import STATUS_TO_SIMPLIFIED
 from ..views.openvex import OpenVex
 from ..controllers.packages import PackagesController
@@ -105,12 +105,13 @@ def init_app(app):
         from ..models.variant import Variant as DBVariant
         variant_id = request.args.get('variant_id')
         project_id = request.args.get('project_id')
-        vid = None
+        variant_ids: list[_uuid.UUID] | None
         if variant_id:
             try:
                 vid = _uuid.UUID(variant_id)
             except ValueError:
                 return {"error": "Invalid variant_id"}, 400
+            variant_ids = [vid]
             assessments = DBAssessment.get_handmade([vid])
         elif project_id:
             try:
@@ -120,6 +121,7 @@ def init_app(app):
             variant_ids = [variant.id for variant in DBVariant.get_by_project(pid)]
             assessments = DBAssessment.get_handmade(variant_ids)
         else:
+            variant_ids = None
             assessments = DBAssessment.get_handmade()
 
         # Enrich with vulnerability texts for front-end tooltips (single DB pass)
@@ -143,8 +145,20 @@ def init_app(app):
                 SBOMObservation.description,
             )
             .where(SBOMObservation.vulnerability_id.in_(vuln_ids))
+            .order_by(  # order by to have reproducible results (testing)
+                SBOMObservation.vulnerability_id,
+                SBOMObservation.key,
+                SBOMObservation.description,
+            )
             .distinct()
         )
+        if variant_ids is not None:
+            sbom_observation_query = sbom_observation_query \
+                .where(SBOMObservation.sbom_document_id.in_(
+                    select(SBOMDocument.id)
+                    .join(Scan, SBOMDocument.scan_id == Scan.id)
+                    .where(Scan.variant_id.in_(variant_ids))
+                ))
         for vuln_id, obs_key, obs_desc in db.session.execute(sbom_observation_query).all():
             vuln_texts[vuln_id].append({
                 "title": obs_key,

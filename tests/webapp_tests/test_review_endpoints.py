@@ -19,8 +19,8 @@ import pytest
 from src.bin.webapp import create_app
 from . import write_demo_files, setup_demo_db
 
-VARIANT_UUID = "22222222-2222-2222-2222-222222222222"
-PROJECT_UUID = "11111111-1111-1111-1111-111111111111"
+VARIANT_UUID = uuid.UUID("22222222-2222-2222-2222-222222222222")
+PROJECT_UUID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
 
 # ── fixtures ──────────────────────────────────────────────────────────────
@@ -130,6 +130,155 @@ def test_review_list_by_project_no_variants(client):
     assert resp.status_code == 200
     data = json.loads(resp.data)
     assert data == []
+
+
+class TestReviewListTexts:
+    VARIANT_A = uuid.UUID(int=1)
+    VARIANT_B = uuid.UUID(int=2)
+    VULNERABILITY_ID = "CVE-2020-35492"
+
+    @pytest.fixture(autouse=True)
+    def _setup(self, app):
+        from src.extensions import db
+        from src.models import Scan, SBOMDocument, Variant, SBOMObservation, Assessment, Finding
+
+        with app.app_context():
+            variant_a = Variant(id=self.VARIANT_A, project_id=PROJECT_UUID, name="a")
+            variant_b = Variant(id=self.VARIANT_B, project_id=PROJECT_UUID, name="b")
+            scan_a = Scan(variant=variant_a)
+            scan_b = Scan(variant=variant_b)
+            doc_a = SBOMDocument(path="x", source_name="x", format="x", scan=scan_a)
+            doc_b = SBOMDocument(path="x", source_name="x", format="x", scan=scan_b)
+            sbom_observations = [
+                SBOMObservation(
+                    vulnerability_id=self.VULNERABILITY_ID,
+                    sbom_document=doc_a,
+                    key="Text A",
+                    description="Text specific to A",
+                ),
+                SBOMObservation(
+                    vulnerability_id=self.VULNERABILITY_ID,
+                    sbom_document=doc_a,
+                    key="Text Shared",
+                    description="Content for A",
+                ),
+                SBOMObservation(
+                    vulnerability_id=self.VULNERABILITY_ID,
+                    sbom_document=doc_a,
+                    key="Text Duplicated",
+                    description="Same content for both",
+                ),
+                SBOMObservation(
+                    vulnerability_id=self.VULNERABILITY_ID,
+                    sbom_document=doc_b,
+                    key="Text Shared",
+                    description="Content for B",
+                ),
+                SBOMObservation(
+                    vulnerability_id=self.VULNERABILITY_ID,
+                    sbom_document=doc_b,
+                    key="Text Duplicated",
+                    description="Same content for both",
+                ),
+            ]
+            finding = Finding.get_by_vulnerability(self.VULNERABILITY_ID)[0]
+            assess_a = Assessment.create(status="x", variant_id=self.VARIANT_A, finding_id=finding.id, origin="custom")
+            assess_b = Assessment.create(status="x", variant_id=self.VARIANT_B, finding_id=finding.id, origin="custom")
+            db.session.add_all(sbom_observations + [assess_a, assess_b])
+            db.session.commit()
+
+    def test_no_variants_all(self, client):
+        resp = client.get("/api/assessments/review")
+        assert resp.status_code == 200
+        assessments = json.loads(resp.data)
+
+        assert isinstance(assessments, list)
+        assert len(assessments) == 2
+        assess_a, assess_b = assessments
+
+        assert assess_a["vuln_texts"] == assess_b["vuln_texts"]  # same vulnerability = same texts
+        assert assess_a["vuln_texts"] == [
+            {
+                "title": "description",
+                "content": "A flaw was found in cairo's image-compositor.c in all versions prior to 1.17.4 [...]"
+            },
+            {
+                "title": "Text A",
+                "content": "Text specific to A"
+            },
+            {  # only once for this duplicated text
+                "title": "Text Duplicated",
+                "content": "Same content for both",
+            },
+            {
+                "title": "Text Shared",
+                "content": "Content for A",
+            },
+            {
+                "title": "Text Shared",
+                "content": "Content for B",
+            },
+        ]
+
+    def test_variant_specific(self, client):
+        resp = client.get(f"/api/assessments/review?variant_id={self.VARIANT_B}")
+        assert resp.status_code == 200
+        assessments = json.loads(resp.data)
+
+        assert isinstance(assessments, list)
+        assert len(assessments) == 1
+        assess_b, = assessments
+
+        assert assess_b["vuln_texts"] == [
+            {
+                "title": "description",
+                "content": "A flaw was found in cairo's image-compositor.c in all versions prior to 1.17.4 [...]"
+            },
+            # Text A does not leak
+            {
+                "title": "Text Duplicated",
+                "content": "Same content for both",
+            },
+            # Text Shared for A does not leak
+            {
+                "title": "Text Shared",
+                "content": "Content for B",
+            },
+        ]
+
+    def test_project_specific(self, client):
+        resp = client.get(f"/api/assessments/review?project_id={PROJECT_UUID}")
+        assert resp.status_code == 200
+        assessments = json.loads(resp.data)
+
+        assert isinstance(assessments, list)
+        assert len(assessments) == 2
+        assess_a, assess_b = assessments
+
+        assert assess_a["vuln_texts"] == assess_b["vuln_texts"]  # same vulnerability = same texts
+
+        assert assess_a["vuln_texts"] == [
+            {
+                "title": "description",
+                "content": "A flaw was found in cairo's image-compositor.c in all versions prior to 1.17.4 [...]"
+            },
+            {
+                "title": "Text A",
+                "content": "Text specific to A"
+            },
+            {  # only once for this duplicated text
+                "title": "Text Duplicated",
+                "content": "Same content for both",
+            },
+            {
+                "title": "Text Shared",
+                "content": "Content for A",
+            },
+            {
+                "title": "Text Shared",
+                "content": "Content for B",
+            },
+        ]
 
 
 # ── GET /api/assessments (project_id path) ───────────────────────────────
